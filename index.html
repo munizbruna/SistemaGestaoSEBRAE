@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGD-A | Sistema de Gestão de Demandas e Alocação (MVP)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- date-fns (para manipulação de datas) -->
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+    <script>
+        // Mapeia globalmente para facilitar o uso no módulo
+        window.dateFns = dateFns;
+    </script>
+    <!-- FullCalendar (para a Agenda) -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+    <style>
+        /* Estilos personalizados */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7fa;
+        }
+        /* Esconde telas por padrão */
+        .tela {
+            display: none;
+        }
+        /* Mostra a tela ativa */
+        .tela.ativa {
+            display: block;
+        }
+        /* Ajustes para o modal */
+        #modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        /* Ajustes do FullCalendar */
+        :root {
+            --fc-border-color: #e2e8f0;
+            --fc-daygrid-event-dot-width: 8px;
+            --fc-list-event-hover-bg-color: #f1f5f9;
+        }
+        .fc .fc-toolbar-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .fc .fc-button-primary {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+        .fc .fc-button-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        .fc .fc-daygrid-day.fc-day-today {
+            background-color: #f0f9ff;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <!-- Cabeçalho Principal -->
+    <header class="bg-white shadow-md">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+            <div class="flex items-center space-x-4">
+                <svg class="h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12v-.008Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75v-.008Zm0 2.25h.008v.008H9.75v-.008Zm0-4.5h.008v.008H9.75v-.008Zm1.5-2.25h.008v.008H11.25v-.008Zm1.5 0h.008v.008H12.75v-.008Zm1.5 0h.008v.008H14.25v-.008ZM9.75 9.75h.008v.008H9.75v-.008Zm1.5 0h.008v.008H11.25v-.008Zm1.5 0h.008v.008H12.75v-.008Zm1.5 0h.008v.008H14.25v-.008Z" />
+                </svg>
+                <h1 class="text-xl font-bold text-gray-800">SGD-A (MVP)</h1>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="nav-painel" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-white bg-blue-600" aria-current="page">Painel</button>
+                <button id="nav-agenda" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700">Agenda</button>
+                <button id="nav-cadastros" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700">Cadastros</button>
+            </div>
+            <!-- Simulador de Perfil de Usuário -->
+            <div id="simulador-perfil" class="flex items-center space-x-2">
+                <label for="simular-usuario-select" class="text-sm font-medium text-gray-600">Visão:</label>
+                <select id="simular-usuario-select" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1">
+                    <option value="Coordenador">Coordenador</option>
+                    <option value="Solicitante">Solicitante</option>
+                </select>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- TELA 1: Painel de Demandas -->
+        <div id="tela-painel" class="tela ativa">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-900">Painel de Gestão de Demandas</h2>
+                <button id="btn-nova-demanda" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
+                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                    </svg>
+                    Nova Demanda
+                </button>
+            </div>
+
+            <!-- Abas de Status -->
+            <div class="mb-4 border-b border-gray-200">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button data-status="Aguardando Aprovação" class="tab-link-aprovacao tab-link whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Aguardando Aprovação <span id="count-aguardando" class="ml-1.5 rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-xs font-medium">0</span>
+                    </button>
+                    <button data-status="Solicitada" class="tab-link whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600">
+                        Solicitadas <span id="count-solicitada" class="ml-1.5 rounded-full bg-blue-100 text-blue-600 px-2 py-0.5 text-xs font-medium">0</span>
+                    </button>
+                    <button data-status="Programada" class="tab-link whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Programadas <span id="count-programada" class="ml-1.5 rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-medium">0</span>
+                    </button>
+                    <button data-status="Em Andamento" class="tab-link whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Em Andamento <span id="count-emandamento" class="ml-1.5 rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-medium">0</span>
+                    </button>
+                    <button data-status="Concluída" class="tab-link whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Concluídas
+                    </button>
+                    <button data-status="Cancelada" class="tab-link whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Canceladas
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tabela de Demandas -->
+            <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Município</th>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horário</th>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Docente</th>
+                                <th scope="col" class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-demandas-corpo" class="bg-white divide-y divide-gray-200">
+                            <!-- Linhas de demanda serão inseridas aqui pelo JS -->
+                            <!-- Exemplo de linha -->
+                            <!--
+                            <tr>
+                                <td class="px-5 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">Fabricação de Ovos de Páscoa</div>
+                                    <div class="text-sm text-gray-500">Alimentos</div>
+                                </td>
+                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">Maracaí</td>
+                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">17/03/25 - 24/03/25</td>
+                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">13h-17h</td>
+                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">Herith</td>
+                                <td class="px-5 py-4 whitespace-nowrap text-sm font-medium text-yellow-600">(A Alocar)</td>
+                                <td class="px-5 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="btn-alocar bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-md text-xs">Alocar Agora</button>
+                                </td>
+                            </tr>
+                            -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="loading-demandas" class="text-center p-10 text-gray-500">Carregando demandas...</div>
+
+        </div>
+
+        <!-- TELA 2: Agenda (FullCalendar) -->
+        <div id="tela-agenda" class="tela">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-900">Agenda de Alocações</h2>
+                <div class="flex space-x-4">
+                    <select id="filtro-agenda-tipo" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="docentes">Visão por Docentes</option>
+                        <option value="recursos">Visão por Recursos</option>
+                    </select>
+                    <select id="filtro-agenda-selecao" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <!-- Opções carregadas pelo JS -->
+                    </select>
+                </div>
+            </div>
+            <div id="loading-agenda" class="text-center p-10 text-gray-500">Carregando agenda...</div>
+            <div id='calendar-container' class="bg-white p-4 rounded-lg shadow-lg">
+                <div id='calendar'></div>
+            </div>
+        </div>
+
+        <!-- TELA 3: Cadastros -->
+        <div id="tela-cadastros" class="tela">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-6">Cadastros</h2>
+            <p class="text-gray-600 mb-4">Gerencie os dados mestres do sistema. (Funcionalidade de cadastro completo será expandida pós-MVP).</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <!-- Card Docentes -->
+                <div class="bg-white shadow-lg rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-3">Docentes</h3>
+                    <form id="form-add-docente">
+                        <input type="text" id="docente-nome" placeholder="Nome do Docente" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                        <select id="docente-area" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                            <option value="">Selecione a Área Principal</option>
+                            <option value="Alimentos">Alimentos</option>
+                            <option value="Metalurgia">Metalurgia</option>
+                            <option value="Construção Civil">Construção Civil</option>
+                            <option value="Gestão">Gestão</option>
+                        </select>
+                        <input type="text" id="docente-subareas" placeholder="Subáreas (separadas por vírgula)" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                        <select id="docente-contrato" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                            <option value="">Tipo de Contrato</option>
+                            <option value="Mensalista">Mensalista (40h/sem)</option>
+                            <option value="Horista">Horista (200h/mês)</option>
+                        </select>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Adicionar Docente</button>
+                    </form>
+                    <ul id="lista-docentes" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></ul>
+                </div>
+
+                <!-- Card Cursos -->
+                <div class="bg-white shadow-lg rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-3">Cursos</h3>
+                    <form id="form-add-curso">
+                        <input type="text" id="curso-titulo" placeholder="Título do Curso" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                        <select id="curso-area" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                            <option value="">Selecione a Área</option>
+                            <option value="Alimentos">Alimentos</option>
+                            <option value="Metalurgia">Metalurgia</option>
+                            <option value="Construção Civil">Construção Civil</option>
+                            <option value="Gestão">Gestão</option>
+                        </select>
+                        <input type="number" id="curso-ch-tecnica" placeholder="CH Técnica (ex: 80)" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                        <input type="number" id="curso-ch-gestao" placeholder="CH Gestão (ex: 8)" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                        <select id="curso-recursos" class="w-full border-gray-300 rounded-md shadow-sm mb-2">
+                            <option value="">Recurso Crítico (Opcional)</option>
+                            <!-- Recursos carregados do DB -->
+                        </select>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Adicionar Curso</button>
+                    </form>
+                    <ul id="lista-cursos" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></ul>
+                </div>
+
+                <!-- Card Recursos -->
+                <div class="bg-white shadow-lg rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-3">Recursos (Escolas Móveis)</h3>
+                    <form id="form-add-recurso">
+                        <input type="text" id="recurso-nome" placeholder="Nome do Recurso (ex: EM 1075)" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                        <select id="recurso-tipo" class="w-full border-gray-300 rounded-md shadow-sm mb-2" required>
+                            <option value="Móvel">Escola Móvel</option>
+                            <option value="Kit">Kit</option>
+                            <option value="Sala">Sala Especial</option>
+                        </select>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Adicionar Recurso</button>
+                    </form>
+                    <ul id="lista-recursos" class="mt-4 space-y-2 max-h-40 overflow-y-auto"></ul>
+                </div>
+            </div>
+            
+            <button id="btn-seed-db" class="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow">Carregar Dados da Planilha (Demo)</button>
+            <p id="seed-status" class="mt-2 text-sm text-gray-600"></p>
+        </div>
+
+    </main>
+
+    <!-- MODAL: Nova Demanda -->
+    <div id="modal-nova-demanda" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div id="modal-backdrop" class="fixed inset-0 transition-opacity" aria-hidden="true"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 sm:p-8 transform transition-all">
+                <button id="btn-fechar-modal-demanda" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h3 class="text-xl font-semibold text-gray-900 mb-6">Registrar Nova Demanda</h3>
+                <form id="form-nova-demanda" class="space-y-4">
+                    <!-- Tipo de Registro -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tipo de Registro</label>
+                        <fieldset class="mt-2">
+                            <legend class="sr-only">Tipo de Registro</legend>
+                            <div class="flex items-center space-x-6">
+                                <div class="flex items-center">
+                                    <input id="tipoDemandaCoordenacao" name="tipoDemanda" type="radio" value="Coordenador" checked class="h-4 w-4 text-blue-600 border-gray-300">
+                                    <label for="tipoDemandaCoordenacao" class="ml-2 block text-sm text-gray-900">Demanda da Coordenação</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input id="tipoDemandaSolicitante" name="tipoDemanda" type="radio" value="Solicitante" class="h-4 w-4 text-blue-600 border-gray-300">
+                                    <label for="tipoDemandaSolicitante" class="ml-2 block text-sm text-gray-900">Demanda do Solicitante</label>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="demanda-solicitante" class="block text-sm font-medium text-gray-700">Solicitante</label>
+                            <input type="text" id="demanda-solicitante" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="demanda-municipio" class="block text-sm font-medium text-gray-700">Município</label>
+                            <input type="text" id="demanda-municipio" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="demanda-area" class="block text-sm font-medium text-gray-700">Área de Atuação</label>
+                        <select id="demanda-area" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                            <option value="">Selecione a Área</option>
+                            <!-- Populado por JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="demanda-curso" class="block text-sm font-medium text-gray-700">Curso</label>
+                        <select id="demanda-curso" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required disabled>
+                            <option value="">Selecione primeiro a Área</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="demanda-data-inicio" class="block text-sm font-medium text-gray-700">Data Início</label>
+                            <input type="date" id="demanda-data-inicio" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="demanda-data-fim" class="block text-sm font-medium text-gray-700">Data Fim</label>
+                            <input type="date" id="demanda-data-fim" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                    </div>
+                    <!-- Campos de Gestão (visíveis apenas para Coordenador) -->
+                    <div id="campos-gestao" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="demanda-data-gestao1" class="block text-sm font-medium text-gray-700">Data Gestão 1 (Opcional)</label>
+                            <input type="date" id="demanda-data-gestao1" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label for="demanda-data-gestao2" class="block text-sm font-medium text-gray-700">Data Gestão 2 (Opcional)</label>
+                            <input type="date" id="demanda-data-gestao2" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="demanda-horario-inicio" class="block text-sm font-medium text-gray-700">Horário Início</label>
+                            <input type="time" id="demanda-horario-inicio" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="demanda-horario-fim" class="block text-sm font-medium text-gray-700">Horário Fim</label>
+                            <input type="time" id="demanda-horario-fim" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Dias da Semana</label>
+                        <div class="flex flex-wrap gap-2">
+                            <!-- Checkboxes para dias da semana -->
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="1" class="rounded text-blue-600" checked> <span>Seg</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="2" class="rounded text-blue-600" checked> <span>Ter</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="3" class="rounded text-blue-600" checked> <span>Qua</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="4" class="rounded text-blue-600" checked> <span>Qui</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="5" class="rounded text-blue-600" checked> <span>Sex</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="6" class="rounded text-blue-600"> <span>Sáb</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md border border-gray-300">
+                                <input type="checkbox" name="diasSemana" value="0" class="rounded text-blue-600"> <span>Dom</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="pt-5">
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow">Salvar Demanda</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL: Tela de Alocação -->
+    <div id="modal-alocacao" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div id="modal-backdrop-alocacao" class="fixed inset-0 transition-opacity" aria-hidden="true" style="background-color: rgba(0, 0, 0, 0.5);"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-4xl p-6 sm:p-8 transform transition-all">
+                <button id="btn-fechar-modal-alocacao" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h3 id="alocacao-titulo" class="text-xl font-semibold text-gray-900 mb-6">Alocar Demanda: ...</h3>
+
+                <!-- Secção 1: Resumo -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+                    <h4 class="text-lg font-medium text-gray-800 mb-3">Resumo da Demanda</h4>
+                    <div id="alocacao-resumo" class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                        <!-- Conteúdo preenchido por JS -->
+                    </div>
+                </div>
+
+                <!-- Secção 2: Verificação de Recursos -->
+                <div class="p-4 rounded-lg mb-6 border border-gray-200">
+                    <h4 class="text-lg font-medium text-gray-800 mb-3">Verificação de Recursos</h4>
+                    <div id="alocacao-recursos">
+                        <!-- Conteúdo preenchido por JS -->
+                    </div>
+                </div>
+
+                <!-- Secção 3: Sugestões de Docentes -->
+                <div>
+                    <h4 class="text-lg font-medium text-gray-800 mb-3">Sugestões de Docentes</h4>
+                    <div id="alocacao-loading-docentes" class="text-center p-8 text-gray-500">
+                        <svg class="animate-spin h-6 w-6 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Analisando competências, agendas e contratos...
+                    </div>
+                    <div id="alocacao-sugestoes" class="space-y-4">
+                        <!-- Cards de sugestão preenchidos por JS -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast de Notificação -->
+    <div id="toast-notificacao" class="fixed bottom-5 right-5 bg-green-600 text-white py-3 px-5 rounded-lg shadow-lg hidden z-50 transform translate-y-20 transition-transform duration-300 ease-out">
+        <span id="toast-mensagem"></span>
+    </div>
+
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Importar Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            setDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            where, 
+            getDocs,
+            Timestamp,
+            setLogLevel // Movido para cá
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuração Firebase ---
+        
+        // VARIÁVEIS GLOBAIS FORNECIDAS PELO AMBIENTE
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'wiki1dtm';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app, db, auth;
+        let userId = null;
+        let isAuthReady = false;
+
+        // Coleções do Firestore
+        let docentesCol, cursosCol, recursosCol, demandasCol;
+
+        // Estado da Aplicação
+        let todosDocentes = [];
+        let todosCursos = [];
+        let todosRecursos = [];
+        let todasDemandas = [];
+        let filtroStatusAtual = 'Solicitada';
+        let calendar;
+        let usuarioAtual = 'Coordenador'; // 'Coordenador' ou 'Solicitante'
+
+        // --- Inicialização ---
+
+        async function inicializarApp() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug'); // Ativa logs detalhados do Firestore
+
+                console.log("Firebase App inicializado. Aguardando autenticação...");
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        console.log("Usuário autenticado:", user.uid);
+                        userId = user.uid;
+                        isAuthReady = true;
+                        
+                        // Definir caminhos das coleções
+                        docentesCol = collection(db, `artifacts/${appId}/public/data/docentes`);
+                        cursosCol = collection(db, `artifacts/${appId}/public/data/cursos`);
+                        recursosCol = collection(db, `artifacts/${appId}/public/data/recursos`);
+                        demandasCol = collection(db, `artifacts/${appId}/public/data/demandas`);
+
+                        // Iniciar carregamento de dados e ouvintes
+                        iniciarOuvintes();
+                        inicializarCalendario();
+                        carregarFiltrosAgenda();
+                        atualizarVisaoPorUsuario(); // Aplicar visão inicial
+                    } else {
+                        console.log("Nenhum usuário logado, tentando login...");
+                        isAuthReady = false;
+                        await autenticar();
+                    }
+                });
+
+                if (!auth.currentUser) {
+                    await autenticar();
+                }
+
+            } catch (error) {
+                console.error("Erro ao inicializar Firebase:", error);
+                document.body.innerHTML = "<div class='p-10 text-center text-red-600'>Erro crítico ao conectar com o banco de dados. Verifique a configuração do Firebase.</div>";
+            }
+        }
+
+        async function autenticar() {
+            try {
+                if (initialAuthToken) {
+                    console.log("Autenticando com token customizado...");
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    console.log("Autenticando anonimamente...");
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Erro na autenticação:", error);
+            }
+        }
+
+        // --- Ouvintes do Firestore (Listeners) ---
+
+        function iniciarOuvintes() {
+            if (!isAuthReady) return;
+
+            console.log("Iniciando ouvintes do Firestore...");
+
+            // Ouvinte de Demandas
+            const qDemandas = query(demandasCol);
+            onSnapshot(qDemandas, (snapshot) => {
+                console.log("Novos dados de demandas recebidos.");
+                todasDemandas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderPainelDemandas();
+                atualizarEventosCalendario();
+                atualizarContagensAbas();
+            }, (error) => console.error("Erro ao ouvir demandas:", error));
+
+            // Ouvinte de Docentes
+            const qDocentes = query(docentesCol);
+            onSnapshot(qDocentes, (snapshot) => {
+                console.log("Novos dados de docentes recebidos.");
+                todosDocentes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                carregarFiltrosAgenda();
+                renderListaCadastros('docentes', todosDocentes, 'lista-docentes', doc => `${doc.nome} (${doc.contrato})`);
+            }, (error) => console.error("Erro ao ouvir docentes:", error));
+
+            // Ouvinte de Cursos
+            const qCursos = query(cursosCol);
+            onSnapshot(qCursos, (snapshot) => {
+                console.log("Novos dados de cursos recebidos.");
+                todosCursos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                popularSelectCursos();
+                renderListaCadastros('cursos', todosCursos, 'lista-cursos', curso => `${curso.titulo} (${curso.area})`);
+            }, (error) => console.error("Erro ao ouvir cursos:", error));
+
+            // Ouvinte de Recursos
+            const qRecursos = query(recursosCol);
+            onSnapshot(qRecursos, (snapshot) => {
+                console.log("Novos dados de recursos recebidos.");
+                todosRecursos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                carregarFiltrosAgenda();
+                popularSelectRecursos();
+                renderListaCadastros('recursos', todosRecursos, 'lista-recursos', rec => `${rec.nome} (${rec.tipo})`);
+            }, (error) => console.error("Erro ao ouvir recursos:", error));
+        }
+
+        // --- Renderização de Telas ---
+
+        function navegarPara(telaId) {
+            console.log("Navegando para:", telaId);
+            document.querySelectorAll('.tela').forEach(tela => tela.classList.remove('ativa'));
+            document.getElementById(telaId).classList.add('ativa');
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('bg-blue-600', 'text-white');
+                link.classList.add('text-gray-500', 'hover:bg-gray-100', 'hover:text-gray-700');
+            });
+            
+            const linkAtivo = document.getElementById(`nav-${telaId.split('-')[1]}`);
+            if (linkAtivo) {
+                linkAtivo.classList.add('bg-blue-600', 'text-white');
+                linkAtivo.classList.remove('text-gray-500', 'hover:bg-gray-100', 'hover:text-gray-700');
+            }
+            
+            if(telaId === 'tela-agenda') {
+                setTimeout(() => calendar.render(), 10); // Garante renderização do calendário
+            }
+        }
+
+        /**
+         * Atualiza a UI com base no perfil do usuário simulado
+         */
+        function atualizarVisaoPorUsuario() {
+            console.log(`Atualizando visão para: ${usuarioAtual}`);
+            const navCadastros = document.getElementById('nav-cadastros');
+            const seedButton = document.getElementById('btn-seed-db');
+            const tabAguardando = document.querySelector('.tab-link-aprovacao');
+            const tipoDemandaCoord = document.getElementById('tipoDemandaCoordenacao');
+            const tipoDemandaSoli = document.getElementById('tipoDemandaSolicitante');
+            
+            if (usuarioAtual === 'Coordenador') {
+                navCadastros.style.display = 'block';
+                seedButton.style.display = 'block';
+                tabAguardando.style.display = 'block';
+                if (tipoDemandaCoord) tipoDemandaCoord.disabled = false;
+                if (tipoDemandaSoli) tipoDemandaSoli.disabled = false;
+
+                // Coordenador começa na aba de aprovação se houver itens
+                const contagemAguardando = parseInt(document.getElementById('count-aguardando').textContent || '0');
+                if (contagemAguardando > 0) {
+                    mudarAbaStatus(null, 'Aguardando Aprovação');
+                } else {
+                    mudarAbaStatus(null, 'Solicitada');
+                }
+                
+            } else { // Solicitante
+                navCadastros.style.display = 'none';
+                seedButton.style.display = 'none';
+                tabAguardando.style.display = 'none';
+                
+                // Força o tipo de demanda para Solicitante
+                if (tipoDemandaCoord) tipoDemandaCoord.disabled = true;
+                if (tipoDemandaSoli) {
+                    tipoDemandaSoli.disabled = true;
+                    tipoDemandaSoli.checked = true;
+                }
+
+                // Se estava na aba 'Aguardando Aprovação', move para 'Solicitada'
+                if (filtroStatusAtual === 'Aguardando Aprovação' || filtroStatusAtual === 'Solicitada') {
+                    mudarAbaStatus(null, 'Programada');
+                }
+                
+                // Esconde tela de cadastros se estiver nela
+                if (document.getElementById('tela-cadastros').classList.contains('ativa')) {
+                    navegarPara('tela-painel');
+                }
+            }
+            
+            // Re-renderiza o painel para esconder/mostrar botões de ação
+            renderPainelDemandas();
+        }
+
+        // --- TELA 1: Painel de Demandas ---
+
+        function renderPainelDemandas() {
+            if (!isAuthReady) {
+                console.warn("Renderização do painel bloqueada. Autenticação pendente.");
+                return;
+            }
+            console.log("Renderizando painel para status:", filtroStatusAtual);
+            
+            const corpoTabela = document.getElementById('tabela-demandas-corpo');
+            const loadingEl = document.getElementById('loading-demandas');
+            
+            const demandasFiltradas = todasDemandas.filter(d => d.status === filtroStatusAtual);
+            
+            if (demandasFiltradas.length === 0) {
+                corpoTabela.innerHTML = '';
+                loadingEl.innerHTML = `Nenhuma demanda com status "${filtroStatusAtual}".`;
+                loadingEl.style.display = 'block';
+                return;
+            }
+
+            loadingEl.style.display = 'none';
+            corpoTabela.innerHTML = ''; // Limpa tabela
+
+            demandasFiltradas.forEach(demanda => {
+                const curso = todosCursos.find(c => c.id === demanda.idCurso);
+                const docente = todosDocentes.find(d => d.id === demanda.idDocenteAlocado);
+                
+                const dataInicio = formatarData(demanda.dataInicio);
+                const dataFim = formatarData(demanda.dataFim);
+                
+                let docenteHtml = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">(A Alocar)</span>`;
+                let acaoHtml = `<button data-id="${demanda.id}" class="btn-alocar bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-md text-xs">Alocar Agora</button>`;
+                
+                if (demanda.status === 'Aguardando Aprovação') {
+                    docenteHtml = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">(Aguardando)</span>`;
+                    acaoHtml = `<button data-id="${demanda.id}" class="btn-aprovar bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-md text-xs">Aprovar</button>`;
+                }
+                
+                if (demanda.status !== 'Solicitada' && demanda.status !== 'Aguardando Aprovação') {
+                    if (docente) {
+                        docenteHtml = `<span class="font-medium text-gray-800">${docente.nome}</span>`;
+                    } else {
+                        docenteHtml = `<span class="text-gray-500">(N/A)</span>`;
+                    }
+                    acaoHtml = `<button data-id="${demanda.id}" class="btn-detalhes text-blue-600 hover:text-blue-800 text-xs font-medium">Ver Detalhes</button>`;
+                }
+
+                // Solicitante não pode Alocar nem Aprovar
+                if (usuarioAtual !== 'Coordenador') {
+                    if (demanda.status === 'Solicitada' || demanda.status === 'Aguardando Aprovação') {
+                        acaoHtml = `<span class="text-xs text-gray-500 italic">Pendente</span>`;
+                    }
+                }
+                
+                const linha = `
+                    <tr>
+                        <td class="px-5 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${curso?.titulo || 'Curso não encontrado'}</div>
+                            <div class="text-sm text-gray-500">${curso?.area || 'N/A'}</div>
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">${demanda.municipio}</td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">${dataInicio} - ${dataFim}</td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">${demanda.horarioInicio} - ${demanda.horarioFim}</td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">${demanda.solicitante}</td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm">${docenteHtml}</td>
+                        <td class="px-5 py-4 whitespace-nowrap text-sm font-medium">
+                            ${acaoHtml}
+                        </td>
+                    </tr>
+                `;
+                corpoTabela.innerHTML += linha;
+            });
+        }
+        
+        function atualizarContagensAbas() {
+            const contagens = todasDemandas.reduce((acc, d) => {
+                if (d.status === 'Solicitada') acc.solicitada++;
+                else if (d.status === 'Programada') acc.programada++;
+                else if (d.status === 'Em Andamento') acc.emandamento++;
+                else if (d.status === 'Aguardando Aprovação') acc.aguardando++;
+                return acc;
+            }, { solicitada: 0, programada: 0, emandamento: 0, aguardando: 0 });
+            
+            document.getElementById('count-solicitada').textContent = contagens.solicitada;
+            document.getElementById('count-programada').textContent = contagens.programada;
+            document.getElementById('count-emandamento').textContent = contagens.emandamento;
+            document.getElementById('count-aguardando').textContent = contagens.aguardando;
+        }
+
+        // --- TELA 2: Agenda ---
+
+        function inicializarCalendario() {
+            const calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'pt-br',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                events: [],
+                height: 'auto',
+                eventDidMount: function(info) {
+                    // Adiciona tooltip
+                    info.el.setAttribute('title', info.event.extendedProps.description);
+                }
+            });
+            // Renderiza apenas se a tela estiver ativa (ou na próxima vez que for ativada)
+            if(document.getElementById('tela-agenda').classList.contains('ativa')) {
+                calendar.render();
+            }
+        }
+        
+        function atualizarEventosCalendario() {
+            if (!calendar) return;
+
+            const filtroTipo = document.getElementById('filtro-agenda-tipo').value;
+            const filtroId = document.getElementById('filtro-agenda-selecao').value;
+            
+            const loadingEl = document.getElementById('loading-agenda');
+            loadingEl.style.display = 'block';
+
+            const eventos = [];
+            const demandasParaAgenda = todasDemandas.filter(d => 
+                (d.status === 'Programada' || d.status === 'Em Andamento')
+            );
+            
+            demandasParaAgenda.forEach(demanda => {
+                const curso = todosCursos.find(c => c.id === demanda.idCurso);
+                const docente = todosDocentes.find(d => d.id === demanda.idDocenteAlocado);
+                const recurso = todosRecursos.find(r => r.id === demanda.idRecursoAlocado);
+                
+                // Filtro principal
+                if (filtroTipo === 'docentes' && demanda.idDocenteAlocado !== filtroId) return;
+                if (filtroTipo === 'recursos' && demanda.idRecursoAlocado !== filtroId) return;
+
+                const titulo = `${curso?.titulo || 'Curso'} (${demanda.municipio})`;
+                const descricao = `Docente: ${docente?.nome || 'N/A'}\nRecurso: ${recurso?.nome || 'N/A'}\nHorário: ${demanda.horarioInicio}-${demanda.horarioFim}`;
+
+                // Adiciona evento principal (Técnico)
+                eventos.push({
+                    title: titulo,
+                    start: timestampParaDataStr(demanda.dataInicio),
+                    end: somarUmDia(timestampParaDataStr(demanda.dataFim)), // FullCalendar é exclusivo no 'end'
+                    description: descricao,
+                    color: '#2563eb', // Azul
+                    allDay: true 
+                });
+                
+                // Adiciona eventos de Gestão
+                if (demanda.dataGestao1) {
+                    eventos.push({
+                        title: `Gestão: ${curso?.titulo}`,
+                        start: timestampParaDataStr(demanda.dataGestao1),
+                        description: `Gestão para ${curso?.titulo}`,
+                        color: '#f59e0b', // Amarelo
+                        allDay: true
+                    });
+                }
+                if (demanda.dataGestao2) {
+                     eventos.push({
+                        title: `Gestão: ${curso?.titulo}`,
+                        start: timestampParaDataStr(demanda.dataGestao2),
+                        description: `Gestão para ${curso?.titulo}`,
+                        color: '#f59e0b', // Amarelo
+                        allDay: true
+                    });
+                }
+            });
+
+            calendar.removeAllEvents();
+            calendar.addEventSource(eventos);
+            loadingEl.style.display = 'none';
+        }
+        
+        function carregarFiltrosAgenda() {
+            const filtroTipo = document.getElementById('filtro-agenda-tipo').value;
+            const selectSelecao = document.getElementById('filtro-agenda-selecao');
+            
+            selectSelecao.innerHTML = ''; // Limpa opções
+            
+            if (filtroTipo === 'docentes') {
+                todosDocentes.forEach(doc => {
+                    selectSelecao.innerHTML += `<option value="${doc.id}">${doc.nome}</option>`;
+                });
+            } else {
+                todosRecursos.forEach(rec => {
+                    selectSelecao.innerHTML += `<option value="${rec.id}">${rec.nome}</option>`;
+                });
+            }
+            // Atualiza o calendário com o primeiro item da lista
+            atualizarEventosCalendario();
+        }
+
+        // --- TELA 3: Cadastros ---
+        
+        function renderListaCadastros(tipo, lista, elementoId, formatador) {
+            const ul = document.getElementById(elementoId);
+            ul.innerHTML = '';
+            if (lista.length === 0) {
+                ul.innerHTML = `<li class="text-gray-500 text-sm italic">Nenhum item cadastrado.</li>`;
+                return;
+            }
+            lista.forEach(item => {
+                ul.innerHTML += `<li class="text-sm text-gray-700 p-2 border-b border-gray-100">${formatador(item)}</li>`;
+            });
+        }
+        
+        async function handleCadastro(event, formularioId, colecao, campos) {
+            event.preventDefault();
+            const form = document.getElementById(formularioId);
+            const dados = {};
+            
+            try {
+                for (const campo of campos) {
+                    let valor;
+                    
+                    // Lógica customizada para pegar valor
+                    if (campo.valor !== undefined) {
+                        valor = campo.valor;
+                    } else {
+                        const el = form.querySelector(`#${campo.id}`);
+                        if (!el) {
+                            console.error(`Elemento #${campo.id} não encontrado no formulário ${formularioId}`);
+                            continue;
+                        }
+                        valor = el.value;
+                    }
+                    
+                    // Lógica de formatação de tipo
+                    if (campo.tipo === 'array') valor = valor.split(',').map(s => s.trim()).filter(Boolean);
+                    if (campo.tipo === 'number') valor = Number(valor);
+                    if (campo.id === 'curso-recursos' && valor === "") valor = null; // Trata recurso opcional
+                    
+                    dados[campo.chave] = valor;
+                }
+                
+                await addDoc(colecao, dados);
+                mostrarNotificacao(`${formularioId.split('-')[2]} adicionado com sucesso!`, 'sucesso');
+                form.reset();
+                
+            } catch (error) {
+                console.error("Erro ao adicionar documento:", error);
+                mostrarNotificacao(`Erro ao adicionar: ${error.message}`, 'erro');
+            }
+        }
+        
+        function popularSelectCursos() {
+            // Esta função agora apenas popula as ÁREAS
+            const selectArea = document.getElementById('demanda-area');
+            const areas = [...new Set(todosCursos.map(c => c.area))]; // Pega áreas únicas
+            
+            selectArea.innerHTML = '<option value="">Selecione a Área</option>';
+            areas.sort().forEach(area => {
+                selectArea.innerHTML += `<option value="${area}">${area}</option>`;
+            });
+        }
+        
+        function popularCursosPorArea(area) {
+            const selectCurso = document.getElementById('demanda-curso');
+            
+            if (!area) {
+                selectCurso.innerHTML = '<option value="">Selecione primeiro a Área</option>';
+                selectCurso.disabled = true;
+                return;
+            }
+            
+            const cursosDaArea = todosCursos.filter(c => c.area === area);
+            
+            selectCurso.innerHTML = '<option value="">Selecione o Curso</option>';
+            cursosDaArea.sort((a,b) => a.titulo.localeCompare(b.titulo)).forEach(curso => {
+                selectCurso.innerHTML += `<option value="${curso.id}">${curso.titulo}</option>`;
+            });
+            selectCurso.disabled = false;
+        }
+        
+        function popularSelectRecursos() {
+            const select = document.getElementById('curso-recursos');
+            select.innerHTML = '<option value="">Recurso Crítico (Opcional)</option>';
+            todosRecursos.forEach(rec => {
+                select.innerHTML += `<option value="${rec.id}">${rec.nome}</option>`;
+            });
+        }
+        
+        async function carregarDadosIniciais() {
+            const btn = document.getElementById('btn-seed-db');
+            const status = document.getElementById('seed-status');
+            btn.disabled = true;
+            status.textContent = "Carregando... Verifique o console para detalhes.";
+            
+            try {
+                // Verificar se já existem dados
+                const docentesSnap = await getDocs(docentesCol);
+                if (!docentesSnap.empty) {
+                    status.textContent = "Dados de demonstração já parecem estar carregados.";
+                    btn.disabled = false;
+                    return;
+                }
+                
+                console.log("Iniciando carga de dados iniciais...");
+                
+                // Dados Iniciais (Baseados na planilha CFP927)
+                const docentesData = [
+                    { nome: "Hildo", area: "Alimentos", subareas: ["Panificação", "Confeitaria", "Salgados", "Bolos"], contrato: "Horista", cargaMaxima: 200 },
+                    { nome: "Flávio", area: "Alimentos", subareas: ["Panificação", "Salgados", "Doces Natalinos"], contrato: "Mensalista", cargaMaxima: 40 },
+                    { nome: "Patricia", area: "Alimentos", subareas: ["Doces Natalinos", "Confeitaria"], contrato: "Horista", cargaMaxima: 200 },
+                    { nome: "Marcela", area: "Alimentos", subareas: ["Geléias", "Compotas"], contrato: "Horista", cargaMaxima: 200 },
+                    { nome: "Jeremias", area: "Construção Civil", subareas: ["Hidráulica", "Pintura"], contrato: "Horista", cargaMaxima: 200 },
+                    { nome: "Junior", area: "Construção Civil", subareas: ["Medições", "Alvenaria"], contrato: "Mensalista", cargaMaxima: 40 },
+                    { nome: "Carlos Metalurgia", area: "Metalurgia", subareas: ["Serralheria", "Solda"], contrato: "Mensalista", cargaMaxima: 40 },
+                    { nome: "Ana Eletrica", area: "Construção Civil", subareas: ["Elétrica Residencial"], contrato: "Horista", cargaMaxima: 200 }
+                ];
+                
+                const recursosData = [
+                    { nome: "Escola Móvel 1075 - Serralheria", tipo: "Móvel" },
+                    { nome: "Escola Móvel 1060 - Elétrica", tipo: "Móvel" },
+                    { nome: "Escola Móvel 1059 - Elétrica", tipo: "Móvel" },
+                    { nome: "Kit Cozinha Industrial 01", tipo: "Kit" }
+                ];
+                
+                // Adicionar Recursos e guardar IDs
+                const recursosIds = {};
+                for (const rec of recursosData) {
+                    const docRef = await addDoc(recursosCol, rec);
+                    recursosIds[rec.nome] = docRef.id;
+                    console.log(`Recurso ${rec.nome} adicionado.`);
+                }
+                
+                const cursosData = [
+                    // Alimentos
+                    { titulo: "FABRICAÇÃO DE OVOS DE PÁSCOA", area: "Alimentos", subareaReq: "Confeitaria", chTecnica: 24, chGestao: 0, idRecursoNecessario: null },
+                    { titulo: "SOBREMESAS E BOLO NO POTE", area: "Alimentos", subareaReq: "Confeitaria", chTecnica: 20, chGestao: 8, idRecursoNecessario: null },
+                    { titulo: "Fabricação de Pães Doces e Semi Doces", area: "Alimentos", subareaReq: "Panificação", chTecnica: 40, chGestao: 8, idRecursoNecessario: null },
+                    { titulo: "Panetones e doces Natalinos", area: "Alimentos", subareaReq: "Doces Natalinos", chTecnica: 20, chGestao: 8, idRecursoNecessario: null },
+                    // Construção Civil
+                    { titulo: "Pequenos Reparos em Edificações - Hidráulica", area: "Construção Civil", subareaReq: "Hidráulica", chTecnica: 80, chGestao: 8, idRecursoNecessario: null },
+                    { titulo: "Pequenos Reparos em Edificações - Pintura", area: "Construção Civil", subareaReq: "Pintura", chTecnica: 40, chGestao: 8, idRecursoNecessario: null },
+                    { titulo: "Fundamentos de Instalações Elétricas Residenciais", area: "Construção Civil", subareaReq: "Elétrica Residencial", chTecnica: 40, chGestao: 8, idRecursoNecessario: recursosIds["Escola Móvel 1060 - Elétrica"] },
+                    // Metalurgia
+                    { titulo: "Técnicas Básicas em Serralheria", area: "Metalurgia", subareaReq: "Serralheria", chTecnica: 80, chGestao: 8, idRecursoNecessario: recursosIds["Escola Móvel 1075 - Serralheria"] }
+                ];
+                
+                // Adicionar Docentes e Cursos (capturando os novos docentes para referência)
+                const docentesAdicionados = [];
+                for (const doc of docentesData) {
+                    const docRef = await addDoc(docentesCol, doc);
+                    docentesAdicionados.push({ id: docRef.id, ...doc });
+                }
+                console.log("Docentes adicionados.");
+                
+                const cursosRefs = {};
+                for (const curso of cursosData) {
+                    const docRef = await addDoc(cursosCol, curso);
+                    cursosRefs[curso.titulo] = docRef.id;
+                }
+                console.log("Cursos adicionados.");
+                
+                // Adicionar Demandas de Exemplo (baseadas na planilha)
+                
+                // 1. Demanda SOLICITADA (para alocar) - Ovos de Páscoa
+                await addDoc(demandasCol, {
+                    idCurso: cursosRefs["FABRICAÇÃO DE OVOS DE PÁSCOA"],
+                    solicitante: "Herith",
+                    municipio: "Maracaí",
+                    dataInicio: Timestamp.fromDate(new Date("2025-03-17T12:00:00Z")),
+                    dataFim: Timestamp.fromDate(new Date("2025-03-24T12:00:00Z")),
+                    horarioInicio: "13:00",
+                    horarioFim: "17:00",
+                    diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
+                    status: "Solicitada",
+                    idDocenteAlocado: null,
+                    idRecursoAlocado: null
+                });
+                console.log("Demanda 'Ovos de Páscoa' (Solicitada) adicionada.");
+
+                // 2. Demanda PROGRAMADA (para constar na agenda e criar conflito) - Serralheria
+                const docenteMetalurgia = docentesAdicionados.find(d => d.area === "Metalurgia")?.id;
+                await addDoc(demandasCol, {
+                    idCurso: cursosRefs["Técnicas Básicas em Serralheria"],
+                    solicitante: "Patricia",
+                    municipio: "Rinopolis",
+                    dataInicio: Timestamp.fromDate(new Date("2025-07-07T12:00:00Z")),
+                    dataFim: Timestamp.fromDate(new Date("2025-08-01T12:00:00Z")),
+                    dataGestao1: Timestamp.fromDate(new Date("2025-08-04T12:00:00Z")),
+                    dataGestao2: Timestamp.fromDate(new Date("2025-08-05T12:00:00Z")),
+                    horarioInicio: "18:00",
+                    horarioFim: "22:00",
+                    diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
+                    status: "Programada",
+                    idDocenteAlocado: docenteMetalurgia, // Pré-alocado
+                    idRecursoAlocado: cursosData.find(c => c.titulo === "Técnicas Básicas em Serralheria").idRecursoNecessario
+                });
+                console.log("Demanda 'Serralheria' (Programada) adicionada.");
+
+                // 3. Demanda PROGRAMADA (para constar na agenda) - Pães Doces
+                const docenteFlavio = docentesAdicionados.find(d => d.nome === "Flávio")?.id;
+                await addDoc(demandasCol, {
+                    idCurso: cursosRefs["Fabricação de Pães Doces e Semi Doces"],
+                    solicitante: "Mariana",
+                    municipio: "Garça",
+                    dataInicio: Timestamp.fromDate(new Date("2025-12-03T12:00:00Z")),
+                    dataFim: Timestamp.fromDate(new Date("2025-12-17T12:00:00Z")),
+                    dataGestao1: Timestamp.fromDate(new Date("2025-12-01T12:00:00Z")),
+                    dataGestao2: Timestamp.fromDate(new Date("2025-12-02T12:00:00Z")),
+                    horarioInicio: "18:00",
+                    horarioFim: "22:00",
+                    diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
+                    status: "Programada",
+                    idDocenteAlocado: docenteFlavio, // Pré-alocado
+                    idRecursoAlocado: null
+                });
+                console.log("Demanda 'Pães Doces' (Programada) adicionada.");
+                
+                // 4. Demanda SOLICITADA (para teste de conflito de RECURSO) - Elétrica
+                await addDoc(demandasCol, {
+                    idCurso: cursosRefs["Fundamentos de Instalações Elétricas Residenciais"],
+                    solicitante: "Patricia",
+                    municipio: "Pompéia",
+                    // Datas que conflitam com a Serralheria (07/07 a 01/08)
+                    dataInicio: Timestamp.fromDate(new Date("2025-07-21T12:00:00Z")), 
+                    dataFim: Timestamp.fromDate(new Date("2025-08-01T12:00:00Z")),
+                    dataGestao1: Timestamp.fromDate(new Date("2025-08-04T12:00:00Z")),
+                    dataGestao2: Timestamp.fromDate(new Date("2025-08-05T12:00:00Z")),
+                    horarioInicio: "18:00",
+                    horarioFim: "22:00",
+                    diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
+                    status: "Solicitada",
+                    idDocenteAlocado: null,
+                    idRecursoAlocado: null // O *curso* exige a EM 1060
+                });
+                console.log("Demanda 'Elétrica Pompéia' (Solicitada) adicionada.");
+
+                // 5. Demanda SOLICITADA (para teste de conflito de DOCENTE)
+                const docenteHildo = docentesAdicionados.find(d => d.nome === "Hildo")?.id;
+                await addDoc(demandasCol, { // Bolo no Pote CONCLUÍDA (para cálculo de horas)
+                    idCurso: cursosRefs["SOBREMESAS E BOLO NO POTE"],
+                    solicitante: "Patricia",
+                    municipio: "Tupã",
+                    dataInicio: Timestamp.fromDate(new Date("2025-06-09T12:00:00Z")),
+                    dataFim: Timestamp.fromDate(new Date("2025-06-13T12:00:00Z")),
+                    dataGestao1: Timestamp.fromDate(new Date("2025-06-05T12:00:00Z")),
+                    dataGestao2: Timestamp.fromDate(new Date("2025-06-06T12:00:00Z")),
+                    horarioInicio: "18:30",
+                    horarioFim: "22:30",
+                    diasSemana: ["1", "2", "3", "4", "5"],
+                    status: "Concluída", // Não bloqueia agenda, mas pode entrar em cálculos futuros
+                    idDocenteAlocado: docenteHildo,
+                    idRecursoAlocado: null
+                });
+                await addDoc(demandasCol, { // Panetones PROGRAMADA (para bloquear o Hildo)
+                    idCurso: cursosRefs["Panetones e doces Natalinos"],
+                    solicitante: "Mariana",
+                    municipio: "Gália",
+                    dataInicio: Timestamp.fromDate(new Date("2025-11-11T12:00:00Z")),
+                    dataFim: Timestamp.fromDate(new Date("2025-11-17T12:00:00Z")),
+                    dataGestao1: Timestamp.fromDate(new Date("2025-11-05T12:00:00Z")),
+                    dataGestao2: Timestamp.fromDate(new Date("2025-11-06T12:00:00Z")),
+                    horarioInicio: "18:30",
+                    horarioFim: "22:30",
+                    diasSemana: ["1", "2", "3", "4", "5"],
+                    status: "Programada",
+                    idDocenteAlocado: docenteHildo,
+                    idRecursoAlocado: null
+                });
+                 await addDoc(demandasCol, { // Outra de Panetones SOLICITADA (para conflitar com o Hildo)
+                    idCurso: cursosRefs["Panetones e doces Natalinos"],
+                    solicitante: "Priscila",
+                    municipio: "Ocauçu",
+                    dataInicio: Timestamp.fromDate(new Date("2025-11-11T12:00:00Z")),
+                    dataFim: Timestamp.fromDate(new Date("2025-11-17T12:00:00Z")),
+                    dataGestao1: Timestamp.fromDate(new Date("2025-11-06T12:00:00Z")),
+                    dataGestao2: Timestamp.fromDate(new Date("2025-11-07T12:00:00Z")),
+                    horarioInicio: "13:00",
+                    horarioFim: "17:00",
+                    diasSemana: ["1", "2", "3", "4", "5"],
+                    status: "Solicitada",
+                    idDocenteAlocado: null,
+                    idRecursoAlocado: null
+                });
+                console.log("Demandas de Hildo (Programada e Solicitada) adicionadas para teste de conflito.");
+
+                status.textContent = "Dados de demonstração (baseados na planilha) carregados com sucesso!";
+                
+            } catch (error) {
+                console.error("Erro ao carregar dados iniciais:", error);
+                status.textContent = `Erro: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        // --- MODAL: Nova Demanda ---
+        
+        function abrirModalDemanda() {
+            document.getElementById('form-nova-demanda').reset();
+            popularSelectCursos(); // Popula as ÁREAS
+            
+            // Reseta o select de cursos
+            const selectCurso = document.getElementById('demanda-curso');
+            selectCurso.innerHTML = '<option value="">Selecione primeiro a Área</option>';
+            selectCurso.disabled = true;
+
+            // Define o estado do modal com base no usuário atual
+            const tipoCoord = document.getElementById('tipoDemandaCoordenacao');
+            const tipoSoli = document.getElementById('tipoDemandaSolicitante');
+            const camposGestao = document.getElementById('campos-gestao');
+
+            if (usuarioAtual === 'Coordenador') {
+                tipoCoord.checked = true;
+                tipoSoli.disabled = false;
+                tipoCoord.disabled = false;
+                camposGestao.style.display = 'grid'; // 'grid' ou 'block'
+            } else {
+                tipoSoli.checked = true;
+                tipoSoli.disabled = true;
+                tipoCoord.disabled = true;
+                camposGestao.style.display = 'none';
+            }
+
+            document.getElementById('modal-nova-demanda').classList.remove('hidden');
+        }
+        
+        function fecharModalDemanda() {
+            document.getElementById('modal-nova-demanda').classList.add('hidden');
+        }
+        
+        async function salvarNovaDemanda(event) {
+            event.preventDefault();
+            const form = event.target;
+            
+            const diasSemana = Array.from(form.querySelectorAll('input[name="diasSemana"]:checked')).map(cb => cb.value);
+            const tipoRegistro = form.querySelector('input[name="tipoDemanda"]:checked').value;
+            
+            const novoStatus = (tipoRegistro === 'Coordenador') ? 'Solicitada' : 'Aguardando Aprovação';
+            
+            const dataGestao1 = (tipoRegistro === 'Coordenador' && form.querySelector('#demanda-data-gestao1').value) 
+                ? Timestamp.fromDate(new Date(form.querySelector('#demanda-data-gestao1').value + "T12:00:00Z")) 
+                : null;
+            
+            const dataGestao2 = (tipoRegistro === 'Coordenador' && form.querySelector('#demanda-data-gestao2').value)
+                ? Timestamp.fromDate(new Date(form.querySelector('#demanda-data-gestao2').value + "T12:00:00Z"))
+                : null;
+
+            const demanda = {
+                solicitante: form.querySelector('#demanda-solicitante').value,
+                municipio: form.querySelector('#demanda-municipio').value,
+                idCurso: form.querySelector('#demanda-curso').value,
+                dataInicio: Timestamp.fromDate(new Date(form.querySelector('#demanda-data-inicio').value + "T12:00:00Z")), // Adiciona T12:00:00Z para evitar problemas de fuso
+                dataFim: Timestamp.fromDate(new Date(form.querySelector('#demanda-data-fim').value + "T12:00:00Z")),
+                dataGestao1: dataGestao1,
+                dataGestao2: dataGestao2,
+                horarioInicio: form.querySelector('#demanda-horario-inicio').value,
+                horarioFim: form.querySelector('#demanda-horario-fim').value,
+                diasSemana: diasSemana,
+                status: novoStatus,
+                idDocenteAlocado: null,
+                idRecursoAlocado: null
+            };
+            
+            try {
+                await addDoc(demandasCol, demanda);
+                mostrarNotificacao(`Demanda ${novoStatus.toLowerCase()} com sucesso!`, 'sucesso');
+                fecharModalDemanda();
+                
+                // Se foi o coordenador, foca na aba 'Solicitada'
+                if(novoStatus === 'Solicitada') {
+                    mudarAbaStatus(null, 'Solicitada');
+                }
+                
+            } catch (error) {
+                console.error("Erro ao salvar demanda:", error);
+                mostrarNotificacao(`Erro ao salvar: ${error.message}`, 'erro');
+            }
+        }
+
+        // --- MODAL: Alocação (O "Cérebro") ---
+        
+        async function abrirModalAlocacao(demandaId) {
+            console.log(`Abrindo alocação para demanda ID: ${demandaId}`);
+            const modal = document.getElementById('modal-alocacao');
+            modal.classList.remove('hidden');
+            
+            // Limpar estado anterior
+            document.getElementById('alocacao-sugestoes').innerHTML = '';
+            document.getElementById('alocacao-recursos').innerHTML = '';
+            document.getElementById('alocacao-loading-docentes').style.display = 'block';
+            
+            const demanda = todasDemandas.find(d => d.id === demandaId);
+            if (!demanda) {
+                console.error("Demanda não encontrada para alocação");
+                fecharModalAlocacao();
+                return;
+            }
+            
+            const curso = todosCursos.find(c => c.id === demanda.idCurso);
+            if (!curso) {
+                console.error("Curso não encontrado para alocação");
+                fecharModalAlocacao();
+                return;
+            }
+
+            // Armazena a demanda atual no modal para uso posterior
+            modal.dataset.demandaId = demandaId;
+
+            // 1. Renderizar Resumo da Demanda
+            document.getElementById('alocacao-titulo').textContent = `Alocar Demanda: ${curso.titulo} em ${demanda.municipio}`;
+            document.getElementById('alocacao-resumo').innerHTML = `
+                <div><span class="font-medium text-gray-500 block">Curso:</span> ${curso.titulo}</div>
+                <div><span class="font-medium text-gray-500 block">Período:</span> ${formatarData(demanda.dataInicio)} - ${formatarData(demanda.dataFim)}</div>
+                <div><span class="font-medium text-gray-500 block">Horário:</span> ${demanda.horarioInicio} - ${demanda.horarioFim}</div>
+                <div><span class="font-medium text-gray-500 block">Carga Horária:</span> ${curso.chTecnica}h (Téc) + ${curso.chGestao}h (Gest)</div>
+                <div><span class="font-medium text-gray-500 block">Local:</span> ${demanda.municipio}</div>
+                <div><span class="font-medium text-gray-500 block">Dias:</span> ${demanda.diasSemana.map(d => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d]).join(', ')}</div>
+            `;
+            
+            // 2. Verificar Recursos
+            let recursoDisponivel = true;
+            let idRecursoParaAlocar = curso.idRecursoNecessario || null;
+            
+            if (idRecursoParaAlocar) {
+                const recurso = todosRecursos.find(r => r.id === idRecursoParaAlocar);
+                const conflitoRecurso = verificarConflito(demanda, todasDemandas, 'recurso', idRecursoParaAlocar);
+                
+                if (conflitoRecurso) {
+                    recursoDisponivel = false;
+                    document.getElementById('alocacao-recursos').innerHTML = `
+                        <div class="flex items-center text-red-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" /></svg>
+                            <span><span class="font-bold">${recurso.nome}</span>: ❌ RECURSO INDISPONÍVEL</span>
+                        </div>
+                        <p class="text-sm text-gray-600 ml-7">Conflito com demanda: ${conflitoRecurso.id} (${conflitoRecurso.municipio})</p>
+                    `;
+                } else {
+                    document.getElementById('alocacao-recursos').innerHTML = `
+                        <div class="flex items-center text-green-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" /></svg>
+                            <span><span class="font-bold">${recurso.nome}</span>: ✅ RECURSO DISPONÍVEL</span>
+                        </div>
+                    `;
+                }
+            } else {
+                document.getElementById('alocacao-recursos').innerHTML = `
+                    <div class="flex items-center text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd" /></svg>
+                        <span>Nenhum recurso crítico (ex: Escola Móvel) é necessário para este curso.</span>
+                    </div>
+                `;
+            }
+
+            // 3. Analisar e Sugerir Docentes
+            const sugestoesHtml = [];
+            const subareaRequerida = curso.subareaReq || curso.area; // Usa subárea se definida, senão área
+            
+            for (const docente of todosDocentes) {
+                let status = 'Disponível';
+                let motivos = [];
+                let corIcone = 'text-green-500'; // Verde
+                let icone = 'check'; // check
+                let botaoHtml = `<button data-docente-id="${docente.id}" data-recurso-id="${idRecursoParaAlocar || ''}" class="btn-confirmar-alocacao w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">🟩 Alocar ${docente.nome}</button>`;
+
+                // Filtro 1: Competência
+                const subareasDocente = docente.subareas || [];
+                const temCompetencia = subareasDocente.includes(subareaRequerida) || docente.area === curso.area;
+                
+                if (!temCompetencia) {
+                    // Pula docentes não qualificados (conforme wireframe)
+                    continue; 
+                }
+
+                // Filtro 2: Disponibilidade de Recurso (Se o recurso não estiver disponível, ninguém pode ser alocado)
+                if (!recursoDisponivel) {
+                    status = 'Indisponível';
+                    motivos.push(`Recurso (${todosRecursos.find(r => r.id === idRecursoParaAlocar)?.nome}) indisponível.`);
+                    corIcone = 'text-red-500'; // Vermelho
+                    icone = 'x';
+                    botaoHtml = `<button class="w-full sm:w-auto bg-gray-400 text-gray-700 font-bold py-2 px-4 rounded-lg cursor-not-allowed" disabled>(Indisponível)</button>`;
+                }
+                
+                // Filtro 3: Disponibilidade de Agenda
+                const conflitoAgenda = verificarConflito(demanda, todasDemandas, 'docente', docente.id);
+                if (conflitoAgenda) {
+                    status = 'Indisponível';
+                    const conflitoCurso = todosCursos.find(c => c.id === conflitoAgenda.idCurso);
+                    motivos.push(`Conflito de agenda (Curso: ${conflitoCurso?.titulo || '...'} em ${conflitoAgenda.municipio})`);
+                    corIcone = 'text-red-500';
+                    icone = 'x';
+                    botaoHtml = `<button class="w-full sm:w-auto bg-gray-400 text-gray-700 font-bold py-2 px-4 rounded-lg cursor-not-allowed" disabled>(Indisponível)</button>`;
+                }
+
+                // Filtro 4: Contrato
+                const projecao = calcularCargaHoraria(docente, demanda, todasDemandas, curso);
+                
+                let contratoHtml = '';
+                if (docente.contrato === 'Mensalista') {
+                    contratoHtml = `
+                        <p class="text-sm">Contrato: Mensalista (40h/sem)</p>
+                        <p class="text-sm">Projeção na semana: <span class="font-medium">${projecao.horasSemana}h / 40h</span></p>
+                    `;
+                } else { // Horista
+                    contratoHtml = `
+                        <p class="text-sm">Contrato: Horista (200h/mês)</p>
+                        <p class="text-sm">Carga Atual (Mês): <span class="font-medium">${projecao.horasMesAtuais}h / 200h</span></p>
+                        <p class="text-sm">Projeção Pós-Alocação: <span class="font-medium text-${projecao.violaContrato ? 'red-600' : 'gray-700'}">${projecao.horasMesProjetadas}h / 200h</span></p>
+                    `;
+                }
+                
+                if (projecao.violaContrato && status === 'Disponível') {
+                    status = 'Viola Contrato';
+                    motivos.push(`Alocação excede o limite de ${docente.cargaMaxima}h do contrato.`);
+                    corIcone = 'text-yellow-500'; // Amarelo
+                    icone = 'warning';
+                    botaoHtml = `<button data-docente-id="${docente.id}" data-recurso-id="${idRecursoParaAlocar || ''}" class="btn-confirmar-alocacao w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">🟨 Alocar ${docente.nome} (Viola Contrato ⚠️)</button>`;
+                }
+
+                // Montar o Card de Sugestão
+                sugestoesHtml.push(`
+                    <div class="border rounded-lg shadow-sm overflow-hidden ${status === 'Indisponível' ? 'bg-gray-50 opacity-70' : 'bg-white'}">
+                        <div class="p-4 sm:p-5">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h5 class="text-lg font-semibold text-gray-900">${docente.nome}</h5>
+                                    <p class="text-sm text-gray-500 mb-3">${docente.area} (${(docente.subareas || []).join(', ')})</p>
+                                </div>
+                                <div class="flex items-center space-x-2 px-3 py-1 rounded-full ${corIcone.replace('text-', 'bg-').replace('500', '100')} ${corIcone}">
+                                    ${getIcone(icone)}
+                                    <span class="text-sm font-medium">${status}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="border-t sm:border-t-0 sm:border-l border-gray-200 pl-0 sm:pl-4 pt-3 sm:pt-0">
+                                    <h6 class="text-xs font-semibold text-gray-500 uppercase mb-2">Análise de Contrato</h6>
+                                    ${contratoHtml}
+                                </div>
+                                <div class="border-t border-gray-200 pt-3 ${status === 'Disponível' ? 'hidden' : ''}">
+                                    <h6 class="text-xs font-semibold text-gray-500 uppercase mb-2">Motivos</h6>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        ${motivos.map(m => `<li class="text-sm text-red-600">${m}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end">
+                            ${botaoHtml}
+                        </div>
+                    </div>
+                `);
+            }
+            
+            document.getElementById('alocacao-loading-docentes').style.display = 'none';
+            document.getElementById('alocacao-sugestoes').innerHTML = sugestoesHtml.join('');
+        }
+        
+        function fecharModalAlocacao() {
+            document.getElementById('modal-alocacao').classList.add('hidden');
+        }
+        
+        async function confirmarAlocacao(event) {
+            const btn = event.target;
+            const docenteId = btn.dataset.docenteId;
+            const recursoId = btn.dataset.recursoId;
+            const demandaId = document.getElementById('modal-alocacao').dataset.demandaId;
+            
+            if (!demandaId || !docenteId) {
+                mostrarNotificacao("Erro: ID da demanda ou do docente não encontrado.", 'erro');
+                return;
+            }
+            
+            try {
+                const demandaRef = doc(db, demandasCol.path, demandaId);
+                await updateDoc(demandaRef, {
+                    idDocenteAlocado: docenteId,
+                    idRecursoAlocado: recursoId || null,
+                    status: 'Programada'
+                });
+                
+                mostrarNotificacao('Docente alocado com sucesso! Demanda movida para "Programadas".', 'sucesso');
+                fecharModalAlocacao();
+                
+                // Mudar para a aba "Programadas"
+                mudarAbaStatus(null, 'Programada');
+                
+            } catch (error) {
+                console.error("Erro ao alocar:", error);
+                mostrarNotificacao(`Erro ao alocar: ${error.message}`, 'erro');
+            }
+        }
+        
+        /**
+         * Aprova uma demanda de 'Aguardando Aprovação' para 'Solicitada'
+         */
+        async function handleAprovarDemanda(demandaId) {
+            if (usuarioAtual !== 'Coordenador') {
+                mostrarNotificacao("Apenas Coordenadores podem aprovar demandas.", 'erro');
+                return;
+            }
+            
+            try {
+                const demandaRef = doc(db, demandasCol.path, demandaId);
+                await updateDoc(demandaRef, {
+                    status: 'Solicitada'
+                });
+                
+                mostrarNotificacao('Demanda Aprovada! Pronta para alocação.', 'sucesso');
+                // Mudar para a aba "Solicitadas" para continuar o fluxo
+                mudarAbaStatus(null, 'Solicitada');
+                
+            } catch (error) {
+                console.error("Erro ao aprovar demanda:", error);
+                mostrarNotificacao(`Erro ao aprovar: ${error.message}`, 'erro');
+            }
+        }
+        
+        // --- Lógica de Negócio (O "Cérebro") ---
+        
+        const {
+            isWithinInterval,
+            parseISO,
+            eachDayOfInterval,
+            getDay,
+            startOfMonth,
+            endOfMonth,
+            startOfWeek,
+            endOfWeek,
+            differenceInHours,
+            parse,
+            isEqual,
+            isBefore,
+            isAfter
+        } = window.dateFns;
+
+        /**
+         * Verifica se a nova demanda conflita com as existentes
+         * @param {object} novaDemanda - A demanda a ser alocada
+         * @param {Array} demandasExistentes - Todas as outras demandas
+         * @param {string} tipo - 'docente' ou 'recurso'
+         * @param {string} id - ID do docente ou recurso a ser verificado
+         */
+        function verificarConflito(novaDemanda, demandasExistentes, tipo, id) {
+            const novaDataInicio = timestampParaData(novaDemanda.dataInicio);
+            const novaDataFim = timestampParaData(novaDemanda.dataFim);
+            const novoHorarioInicio = parse(novaDemanda.horarioInicio, 'HH:mm', new Date());
+            const novoHorarioFim = parse(novaDemanda.horarioFim, 'HH:mm', new Date());
+
+            const demandasParaChecar = demandasExistentes.filter(d => 
+                d.id !== novaDemanda.id &&
+                (d.status === 'Programada' || d.status === 'Em Andamento') &&
+                (tipo === 'docente' ? d.idDocenteAlocado === id : d.idRecursoAlocado === id)
+            );
+
+            for (const existente of demandasParaChecar) {
+                const existenteDataInicio = timestampParaData(existente.dataInicio);
+                const existenteDataFim = timestampParaData(existente.dataFim);
+                
+                // 1. Checagem de sobreposição de datas (macro)
+                const sobrepoeDatas = (
+                    (isWithinInterval(novaDataInicio, { start: existenteDataInicio, end: existenteDataFim })) ||
+                    (isWithinInterval(novaDataFim, { start: existenteDataInicio, end: existenteDataFim })) ||
+                    (isWithinInterval(existenteDataInicio, { start: novaDataInicio, end: novaDataFim })) ||
+                    (isWithinInterval(existenteDataFim, { start: novaDataInicio, end: novaDataFim }))
+                );
+
+                if (!sobrepoeDatas) continue;
+                
+                // 2. Checagem de dias da semana (refinamento)
+                const diasComuns = novaDemanda.diasSemana.some(dia => existente.diasSemana.includes(dia));
+                
+                if (!diasComuns) continue;
+
+                // 3. Checagem de horário (refinamento final)
+                const existenteHorarioInicio = parse(existente.horarioInicio, 'HH:mm', new Date());
+                const existenteHorarioFim = parse(existente.horarioFim, 'HH:mm', new Date());
+                
+                const sobrepoeHorarios = (novoHorarioInicio < existenteHorarioFim) && (novoHorarioFim > existenteHorarioInicio);
+
+                if (sobrepoeHorarios) {
+                    return existente; // Conflito encontrado!
+                }
+                
+                // 4. Checagem de dias de Gestão (que são "allDay")
+                const diasGestaoExistentes = [existente.dataGestao1, existente.dataGestao2].filter(Boolean).map(timestampParaData);
+                
+                for (const diaGestao of diasGestaoExistentes) {
+                    if (isWithinInterval(diaGestao, { start: novaDataInicio, end: novaDataFim })) {
+                         return existente; // Conflito com dia de gestão
+                    }
+                }
+                // (O inverso também é verdadeiro, checar se os dias de gestão da *nova* demanda conflitam com cursos existentes)
+                const diasGestaoNovos = [novaDemanda.dataGestao1, novaDemanda.dataGestao2].filter(Boolean).map(timestampParaData);
+                for (const diaGestaoNovo of diasGestaoNovos) {
+                     if (isWithinInterval(diaGestaoNovo, { start: existenteDataInicio, end: existenteDataFim })) {
+                         return existente; // Conflito
+                     }
+                }
+            }
+            return null; // Sem conflitos
+        }
+
+        /**
+         * Calcula a carga horária projetada para um docente
+         */
+        function calcularCargaHoraria(docente, novaDemanda, todasDemandas, curso) {
+            const chTecnica = Number(curso.chTecnica) || 0;
+            const chGestao = Number(curso.chGestao) || 0;
+            const horasTotaisNovaDemanda = chTecnica + chGestao;
+            
+            const dataReferencia = timestampParaData(novaDemanda.dataInicio);
+            
+            // Filtra demandas relevantes (mesmo docente, mesmo mês/semana)
+            const demandasRelevantes = todasDemandas.filter(d => 
+                d.idDocenteAlocado === docente.id &&
+                (d.status === 'Programada' || d.status === 'Em Andamento')
+            );
+            
+            let projecao = { horasMesAtuais: 0, horasMesProjetadas: 0, horasSemana: 0, violaContrato: false };
+
+            if (docente.contrato === 'Mensalista') {
+                const semanaInicio = startOfWeek(dataReferencia, { weekStartsOn: 1 }); // Seg
+                const semanaFim = endOfWeek(dataReferencia, { weekStartsOn: 1 }); // Dom
+                
+                let horasNaSemana = 0;
+                
+                demandasRelevantes.forEach(d => {
+                    // Simplificação: Se a demanda *ocorre* na semana, soma sua carga horária dividida
+                    const cursoDemanda = todosCursos.find(c => c.id === d.idCurso);
+                    if (cursoDemanda) {
+                         horasNaSemana += (Number(cursoDemanda.chTecnica) || 0) + (Number(cursoDemanda.chGestao) || 0); // Simplificado
+                    }
+                });
+                
+                projecao.horasSemana = horasNaSemana + horasTotaisNovaDemanda; // Simplificado
+                projecao.violaContrato = projecao.horasSemana > docente.cargaMaxima; // 40h
+                
+            } else { // Horista
+                const mesInicio = startOfMonth(dataReferencia);
+                const mesFim = endOfMonth(dataReferencia);
+                
+                let horasNoMes = 0;
+                demandasRelevantes.forEach(d => {
+                    const dataInicioDemanda = timestampParaData(d.dataInicio);
+                    const cursoDemanda = todosCursos.find(c => c.id === d.idCurso);
+                    if (cursoDemanda && isWithinInterval(dataInicioDemanda, { start: mesInicio, end: mesFim })) {
+                        horasNoMes += (Number(cursoDemanda.chTecnica) || 0) + (Number(cursoDemanda.chGestao) || 0);
+                    }
+                });
+                
+                projecao.horasMesAtuais = horasNoMes;
+                projecao.horasMesProjetadas = horasNoMes + horasTotaisNovaDemanda;
+                projecao.violaContrato = projecao.horasMesProjetadas > docente.cargaMaxima; // 200h
+            }
+            
+            return projecao;
+        }
+
+        // --- Utilitários ---
+        
+        function mostrarNotificacao(mensagem, tipo = 'sucesso') {
+            const toast = document.getElementById('toast-notificacao');
+            const msgEl = document.getElementById('toast-mensagem');
+            
+            msgEl.textContent = mensagem;
+            
+            if (tipo === 'erro') {
+                toast.classList.remove('bg-green-600');
+                toast.classList.add('bg-red-600');
+            } else {
+                toast.classList.remove('bg-red-600');
+                toast.classList.add('bg-green-600');
+            }
+            
+            toast.classList.remove('hidden', 'translate-y-20');
+            toast.classList.add('translate-y-0');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0');
+                toast.classList.add('translate-y-20');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 4000);
+        }
+
+        function formatarData(timestamp) {
+            if (!timestamp) return 'N/A';
+            try {
+                // Converte Timestamp do Firebase para Date
+                const data = timestamp.toDate();
+                // Formata dd/MM/yy
+                return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            } catch(e) {
+                console.warn("Erro ao formatar data, pode ser string:", timestamp, e);
+                try {
+                    // Tenta formatar caso seja string (fallback)
+                    return new Date(timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                } catch (e2) {
+                    return 'Data Inválida';
+                }
+            }
+        }
+        
+        function timestampParaData(timestamp) {
+             if (!timestamp) return null;
+             return timestamp.toDate();
+        }
+        
+        function timestampParaDataStr(timestamp) {
+            if (!timestamp) return null;
+            // Formato YYYY-MM-DD
+            return timestamp.toDate().toISOString().split('T')[0];
+        }
+
+        function somarUmDia(dataStr) {
+            if (!dataStr) return null;
+            const data = new Date(dataStr + "T12:00:00Z"); // Usa T12 para evitar fuso
+            data.setDate(data.getDate() + 1);
+            return data.toISOString().split('T')[0];
+        }
+
+        function getIcone(nome) {
+            switch (nome) {
+                case 'check':
+                    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.026 3.998-1.406-1.405a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.15-.076l3.5-4.625Z" clip-rule="evenodd" /></svg>`;
+                case 'x':
+                    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm-1.03-9.53a.75.75 0 0 0-1.06 1.06L6.94 8l-1.03 1.03a.75.75 0 0 0 1.06 1.06L8 9.06l1.03 1.03a.75.75 0 1 0 1.06-1.06L9.06 8l1.03-1.03a.75.75 0 1 0-1.06-1.06L8 6.94 6.97 5.47Z" clip-rule="evenodd" /></svg>`;
+                case 'warning':
+                    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /></svg>`;
+                default:
+                    return '';
+            }
+        }
+        
+        function mudarAbaStatus(event, statusForcado = null) {
+            const status = statusForcado || event.currentTarget.dataset.status;
+            if (filtroStatusAtual === status && !statusForcado) return;
+            
+            filtroStatusAtual = status;
+            
+            document.querySelectorAll('.tab-link').forEach(tab => {
+                if (tab.dataset.status === status) {
+                    tab.classList.add('border-blue-500', 'text-blue-600');
+                    tab.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                } else {
+                    tab.classList.remove('border-blue-500', 'text-blue-600');
+                    tab.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                }
+            });
+            
+            renderPainelDemandas();
+        }
+
+        // --- Configuração de Eventos ---
+
+        function setupEventListeners() {
+            // Navegação principal
+            document.getElementById('nav-painel').addEventListener('click', () => navegarPara('tela-painel'));
+            document.getElementById('nav-agenda').addEventListener('click', () => navegarPara('tela-agenda'));
+            document.getElementById('nav-cadastros').addEventListener('click', () => navegarPara('tela-cadastros'));
+            
+            // Abas do Painel
+            document.querySelectorAll('.tab-link').forEach(tab => tab.addEventListener('click', mudarAbaStatus));
+
+            // Modal: Nova Demanda
+            document.getElementById('btn-nova-demanda').addEventListener('click', abrirModalDemanda);
+            document.getElementById('btn-fechar-modal-demanda').addEventListener('click', fecharModalDemanda);
+            document.getElementById('modal-backdrop').addEventListener('click', fecharModalDemanda);
+            document.getElementById('form-nova-demanda').addEventListener('submit', salvarNovaDemanda);
+            
+            // Event Listeners para o Modal de Nova Demanda (Req 1 & 2)
+            document.getElementById('demanda-area').addEventListener('change', (e) => {
+                popularCursosPorArea(e.target.value);
+            });
+            
+            document.querySelectorAll('input[name="tipoDemanda"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const camposGestao = document.getElementById('campos-gestao');
+                    if (e.target.value === 'Coordenador') {
+                        camposGestao.style.display = 'grid';
+                    } else {
+                        camposGestao.style.display = 'none';
+                    }
+                });
+            });
+
+            // Modal: Alocação e Aprovação
+            document.getElementById('tabela-demandas-corpo').addEventListener('click', (e) => {
+                if (e.target && e.target.classList.contains('btn-alocar')) {
+                    abrirModalAlocacao(e.target.dataset.id);
+                }
+                if (e.target && e.target.classList.contains('btn-aprovar')) {
+                    handleAprovarDemanda(e.target.dataset.id);
+                }
+                // Adicionar lógica para 'btn-detalhes' se necessário
+            });
+            document.getElementById('btn-fechar-modal-alocacao').addEventListener('click', fecharModalAlocacao);
+            document.getElementById('modal-backdrop-alocacao').addEventListener('click', fecharModalAlocacao);
+            document.getElementById('alocacao-sugestoes').addEventListener('click', (e) => {
+                 if (e.target && e.target.classList.contains('btn-confirmar-alocacao')) {
+                    confirmarAlocacao(e);
+                }
+            });
+            
+            // Filtros da Agenda
+            document.getElementById('filtro-agenda-tipo').addEventListener('change', carregarFiltrosAgenda);
+            document.getElementById('filtro-agenda-selecao').addEventListener('change', atualizarEventosCalendario);
+            
+            // Simulador de Perfil
+            document.getElementById('simular-usuario-select').addEventListener('change', (e) => {
+                usuarioAtual = e.target.value;
+                atualizarVisaoPorUsuario();
+            });
+            
+            // Cadastros
+            document.getElementById('form-add-docente').addEventListener('submit', (e) => {
+                if (usuarioAtual !== 'Coordenador') return; // Segurança simples
+                const form = e.target; // Definir form aqui
+                handleCadastro(e, 'form-add-docente', docentesCol, [
+                    { id: 'docente-nome', chave: 'nome', tipo: 'string' },
+                    { id: 'docente-area', chave: 'area', tipo: 'string' },
+                    { id: 'docente-subareas', chave: 'subareas', tipo: 'array' },
+                    { id: 'docente-contrato', chave: 'contrato', tipo: 'string' },
+                    // Correção aqui: Pega o valor do select para determinar a carga
+                    { id: 'docente-contrato', chave: 'cargaMaxima', tipo: 'number', valor: (form.querySelector('#docente-contrato').value === 'Mensalista' ? 40 : 200) } // Lógica customizada
+                ]);
+            });
+            
+             document.getElementById('form-add-curso').addEventListener('submit', (e) => {
+                if (usuarioAtual !== 'Coordenador') return;
+                handleCadastro(e, 'form-add-curso', cursosCol, [
+                   { id: 'curso-titulo', chave: 'titulo', tipo: 'string' },
+                   { id: 'curso-area', chave: 'area', tipo: 'string' },
+                   // Simplificado: Usando a área como subárea requerida. Idealmente seria um campo separado.
+                   { id: 'curso-area', chave: 'subareaReq', tipo: 'string' }, 
+                   { id: 'curso-ch-tecnica', chave: 'chTecnica', tipo: 'number' },
+                   { id: 'curso-ch-gestao', chave: 'chGestao', tipo: 'number' },
+                   { id: 'curso-recursos', chave: 'idRecursoNecessario', tipo: 'string' }
+                ])
+            });
+            
+             document.getElementById('form-add-recurso').addEventListener('submit', (e) => {
+                if (usuarioAtual !== 'Coordenador') return;
+                handleCadastro(e, 'form-add-recurso', recursosCol, [
+                   { id: 'recurso-nome', chave: 'nome', tipo: 'string' },
+                   { id: 'recurso-tipo', chave: 'tipo', tipo: 'string' }
+                ])
+            });
+            
+            // Botão de Seed
+            document.getElementById('btn-seed-db').addEventListener('click', carregarDadosIniciais);
+        }
+
+        // --- Ponto de Entrada ---
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            inicializarApp();
+        });
+
+    </script>
+
+</body>
+</html>
