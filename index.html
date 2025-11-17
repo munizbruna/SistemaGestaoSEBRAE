@@ -138,23 +138,6 @@
                         </thead>
                         <tbody id="tabela-demandas-corpo" class="bg-white divide-y divide-gray-200">
                             <!-- Linhas de demanda serão inseridas aqui pelo JS -->
-                            <!-- Exemplo de linha -->
-                            <!--
-                            <tr>
-                                <td class="px-5 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">Fabricação de Ovos de Páscoa</div>
-                                    <div class="text-sm text-gray-500">Alimentos</div>
-                                </td>
-                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">Maracaí</td>
-                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">17/03/25 - 24/03/25</td>
-                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">13h-17h</td>
-                                <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-600">Herith</td>
-                                <td class="px-5 py-4 whitespace-nowrap text-sm font-medium text-yellow-600">(A Alocar)</td>
-                                <td class="px-5 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button class="btn-alocar bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-md text-xs">Alocar Agora</button>
-                                </td>
-                            </tr>
-                            -->
                         </tbody>
                     </table>
                 </div>
@@ -377,7 +360,7 @@
         </div>
     </div>
     
-    <!-- MODAL: Tela de Alocação -->
+    <!-- MODAL: Tela de Alocação (CORRIGIDO) -->
     <div id="modal-alocacao" class="fixed inset-0 z-50 overflow-y-auto hidden">
         <div id="modal-backdrop-alocacao" class="fixed inset-0 transition-opacity" aria-hidden="true" style="background-color: rgba(0, 0, 0, 0.5);"></div>
         <div class="flex items-center justify-center min-h-screen p-4">
@@ -418,6 +401,90 @@
                     <div id="alocacao-sugestoes" class="space-y-4">
                         <!-- Cards de sugestão preenchidos por JS -->
                     </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL: Detalhes da Demanda Programada -->
+    <div id="modal-detalhes-programada" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div id="modal-backdrop-detalhes" class="fixed inset-0 transition-opacity" aria-hidden="true" style="background-color: rgba(0, 0, 0, 0.5);"></div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 sm:p-8 transform transition-all">
+                <button id="btn-fechar-modal-detalhes" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h3 id="detalhes-titulo" class="text-xl font-semibold text-gray-900 mb-6">Detalhes do Curso</h3>
+
+                <!-- Conteúdo do Modal -->
+                <form id="form-detalhes-curso">
+                    <!-- Seção de Informações Estáticas -->
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+                        <h4 class="text-md font-medium text-gray-800 mb-3">Informações Gerais</h4>
+                        <div id="modal-detalhes-info-estatica" class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+                            <!-- Infos não-editáveis (Docente, Período, etc.) vão aqui -->
+                            <p class="text-gray-500 text-center col-span-full">Carregando...</p>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Informações Editáveis (Resultados) -->
+                    <div class="mb-6">
+                        <h4 class="text-md font-medium text-gray-800 mb-3">Resultados e Acompanhamento (Opcional)</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <!-- Coluna 1 -->
+                            <div>
+                                <label for="detalhes-proposta-sgset" class="block text-sm font-medium text-gray-700">Proposta Nº SGSET</label>
+                                <input type="text" id="detalhes-proposta-sgset" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="detalhes-demanda-num" class="block text-sm font-medium text-gray-700">Demanda</label>
+                                <input type="text" id="detalhes-demanda-num" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="detalhes-rae" class="block text-sm font-medium text-gray-700">R.A.E</label>
+                                <input type="text" id="detalhes-rae" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="detalhes-video" class="block text-sm font-medium text-gray-700">Video</label>
+                                <input type="text" id="detalhes-video" placeholder="http://..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="detalhes-matr-previstas" class="block text-sm font-medium text-gray-700">Matr. Previstas</label>
+                                <input type="number" id="detalhes-matr-previstas" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="detalhes-matr-realizadas" class="block text-sm font-medium text-gray-700">Matr. Realizadas</label>
+                                <input type="number" id="detalhes-matr-realizadas" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="detalhes-evasao" class="block text-sm font-medium text-gray-700">Evasão</label>
+                                <input type="number" id="detalhes-evasao" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label for="detalhes-receita" class="block text-sm font-medium text-gray-700">Receita Final</label>
+                                <input type="number" id="detalhes-receita" placeholder="0.00" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Botões de Ação -->
+                <div class="flex flex-col sm:flex-row justify-end sm:space-x-3">
+                    <button id="btn-fechar-modal-detalhes-footer" type="button" class="mt-2 sm:mt-0 bg-white hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300 w-full sm:w-auto">
+                        Fechar
+                    </button>
+                    <button id="btn-salvar-detalhes" type="button" class="mt-2 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow w-full sm:w-auto hidden">
+                        Salvar Alterações
+                    </button>
+                    <button id="btn-iniciar-curso" type="button" class="mt-2 sm:mt-0 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow flex items-center justify-center w-full sm:w-auto hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
+                            <path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm6.39-2.908a.75.75 0 0 1 .766.027l3.5 2.25a.75.75 0 0 1 0 1.262l-3.5 2.25A.75.75 0 0 1 8 12.25v-4.5a.75.75 0 0 1 .39-.658Z" clip-rule="evenodd" />
+                        </svg>
+                        Salvar e Iniciar Curso
+                    </button>
                 </div>
 
             </div>
@@ -525,10 +592,12 @@
                         isAuthReady = true;
                         
                         // Definir caminhos das coleções
-                        docentesCol = collection(db, `artifacts/${appId}/public/data/docentes`);
-                        cursosCol = collection(db, `artifacts/${appId}/public/data/cursos`);
-                        recursosCol = collection(db, `artifacts/${appId}/public/data/recursos`);
-                        demandasCol = collection(db, `artifacts/${appId}/public/data/demandas`);
+                        // MUDANÇA: Mover para o path privado do usuário para evitar erros de permissão.
+                        const userPath = `artifacts/${appId}/users/${userId}`;
+                        docentesCol = collection(db, `${userPath}/docentes`);
+                        cursosCol = collection(db, `${userPath}/cursos`);
+                        recursosCol = collection(db, `${userPath}/recursos`);
+                        demandasCol = collection(db, `${userPath}/demandas`);
 
                         // Iniciar carregamento de dados e ouvintes
                         iniciarOuvintes();
@@ -738,6 +807,7 @@
                     } else {
                         docenteHtml = `<span class="text-gray-500">(N/A)</span>`;
                     }
+                    // Este é o botão que abre o novo modal
                     acaoHtml = `<button data-id="${demanda.id}" class="btn-detalhes text-blue-600 hover:text-blue-800 text-xs font-medium">Ver Detalhes</button>`;
                 }
 
@@ -1057,6 +1127,10 @@
                 console.log("Cursos adicionados.");
                 
                 // Adicionar Demandas de Exemplo (baseadas na planilha)
+                const camposResultadoPadrao = {
+                    propostaSgset: null, demandaNumero: null, raeNumero: null, videoLink: null,
+                    matrPrevistas: null, matrRealizadas: null, evasao: null, receitaFinal: null
+                };
                 
                 // 1. Demanda SOLICITADA (para alocar) - Ovos de Páscoa
                 await addDoc(demandasCol, {
@@ -1070,7 +1144,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
                     status: "Solicitada",
                     idDocenteAlocado: null,
-                    idRecursoAlocado: null
+                    idRecursoAlocado: null,
+                    ...camposResultadoPadrao
                 });
                 console.log("Demanda 'Ovos de Páscoa' (Solicitada) adicionada.");
 
@@ -1089,7 +1164,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
                     status: "Programada",
                     idDocenteAlocado: docenteMetalurgia, // Pré-alocado
-                    idRecursoAlocado: cursosData.find(c => c.titulo === "Técnicas Básicas em Serralheria").idRecursoNecessario
+                    idRecursoAlocado: cursosData.find(c => c.titulo === "Técnicas Básicas em Serralheria").idRecursoNecessario,
+                    ...camposResultadoPadrao
                 });
                 console.log("Demanda 'Serralheria' (Programada) adicionada.");
 
@@ -1108,7 +1184,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
                     status: "Programada",
                     idDocenteAlocado: docenteFlavio, // Pré-alocado
-                    idRecursoAlocado: null
+                    idRecursoAlocado: null,
+                    ...camposResultadoPadrao
                 });
                 console.log("Demanda 'Pães Doces' (Programada) adicionada.");
                 
@@ -1127,7 +1204,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"], // Seg-Sex
                     status: "Solicitada",
                     idDocenteAlocado: null,
-                    idRecursoAlocado: null // O *curso* exige a EM 1060
+                    idRecursoAlocado: null, // O *curso* exige a EM 1060
+                    ...camposResultadoPadrao
                 });
                 console.log("Demanda 'Elétrica Pompéia' (Solicitada) adicionada.");
 
@@ -1146,7 +1224,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"],
                     status: "Concluída", // Não bloqueia agenda, mas pode entrar em cálculos futuros
                     idDocenteAlocado: docenteHildo,
-                    idRecursoAlocado: null
+                    idRecursoAlocado: null,
+                    ...camposResultadoPadrao
                 });
                 await addDoc(demandasCol, { // Panetones PROGRAMADA (para bloquear o Hildo)
                     idCurso: cursosRefs["Panetones e doces Natalinos"],
@@ -1161,7 +1240,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"],
                     status: "Programada",
                     idDocenteAlocado: docenteHildo,
-                    idRecursoAlocado: null
+                    idRecursoAlocado: null,
+                    ...camposResultadoPadrao
                 });
                  await addDoc(demandasCol, { // Outra de Panetones SOLICITADA (para conflitar com o Hildo)
                     idCurso: cursosRefs["Panetones e doces Natalinos"],
@@ -1176,7 +1256,8 @@
                     diasSemana: ["1", "2", "3", "4", "5"],
                     status: "Solicitada",
                     idDocenteAlocado: null,
-                    idRecursoAlocado: null
+                    idRecursoAlocado: null,
+                    ...camposResultadoPadrao
                 });
                 console.log("Demandas de Hildo (Programada e Solicitada) adicionadas para teste de conflito.");
 
@@ -1255,7 +1336,16 @@
                 diasSemana: diasSemana,
                 status: novoStatus,
                 idDocenteAlocado: null,
-                idRecursoAlocado: null
+                idRecursoAlocado: null,
+                // Adiciona campos de resultado como nulos na criação
+                propostaSgset: null,
+                demandaNumero: null,
+                raeNumero: null,
+                videoLink: null,
+                matrPrevistas: null,
+                matrRealizadas: null,
+                evasao: null,
+                receitaFinal: null
             };
             
             try {
@@ -1456,6 +1546,180 @@
             document.getElementById('modal-alocacao').classList.add('hidden');
         }
         
+        // --- MODAL: Detalhes (Programada) ---
+        
+        function abrirModalDetalhes(demandaId) {
+            console.log(`Abrindo detalhes para demanda ID: ${demandaId}`);
+            const modal = document.getElementById('modal-detalhes-programada');
+            const form = document.getElementById('form-detalhes-curso');
+            const infoEstaticaCorpo = document.getElementById('modal-detalhes-info-estatica');
+            const btnIniciar = document.getElementById('btn-iniciar-curso');
+            const btnSalvar = document.getElementById('btn-salvar-detalhes');
+            
+            form.reset(); // Limpa o formulário
+            infoEstaticaCorpo.innerHTML = '<p class="text-gray-500 text-center col-span-full">Carregando...</p>';
+            btnIniciar.classList.add('hidden'); // Esconde por padrão
+            btnSalvar.classList.add('hidden');
+            form.dataset.demandaId = ''; // Limpa ID anterior
+
+            const demanda = todasDemandas.find(d => d.id === demandaId);
+            if (!demanda) {
+                console.error("Demanda não encontrada para detalhes");
+                infoEstaticaCorpo.innerHTML = '<p class="text-red-500 text-center col-span-full">Erro: Demanda não encontrada.</p>';
+                modal.classList.remove('hidden');
+                return;
+            }
+            
+            const curso = todosCursos.find(c => c.id === demanda.idCurso);
+            const docente = todosDocentes.find(d => d.id === demanda.idDocenteAlocado);
+            const recurso = todosRecursos.find(r => r.id === demanda.idRecursoAlocado);
+
+            document.getElementById('detalhes-titulo').textContent = `Detalhes: ${curso?.titulo || 'Curso'}`;
+            
+            // Popula Informações Estáticas
+            infoEstaticaCorpo.innerHTML = `
+                <div>
+                    <span class="font-medium text-gray-500 block">Status:</span> 
+                    <span class="font-semibold text-gray-900">${demanda.status}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Município:</span> 
+                    <span class="text-gray-800">${demanda.municipio}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Período Técnico:</span> 
+                    <span class="text-gray-800">${formatarData(demanda.dataInicio)} - ${formatarData(demanda.dataFim)}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Docente Alocado:</span> 
+                    <span class="font-semibold text-blue-700">${docente?.nome || 'N/A'}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Recurso Alocado:</span> 
+                    <span class="text-gray-800">${recurso?.nome || 'Nenhum'}</span>
+                </div>
+                <div>
+                    <span class="font-medium text-gray-500 block">Solicitante:</span> 
+                    <span class="text-gray-800">${demanda.solicitante}</span>
+                </div>
+            `;
+            
+            // Popula Formulário de Resultados
+            form.querySelector('#detalhes-proposta-sgset').value = demanda.propostaSgset || '';
+            form.querySelector('#detalhes-demanda-num').value = demanda.demandaNumero || '';
+            form.querySelector('#detalhes-rae').value = demanda.raeNumero || '';
+            form.querySelector('#detalhes-video').value = demanda.videoLink || '';
+            form.querySelector('#detalhes-matr-previstas').value = demanda.matrPrevistas || '';
+            form.querySelector('#detalhes-matr-realizadas').value = demanda.matrRealizadas || '';
+            form.querySelector('#detalhes-evasao').value = demanda.evasao || '';
+            form.querySelector('#detalhes-receita').value = demanda.receitaFinal || '';
+            
+            // Armazena o ID no formulário para os botões usarem
+            form.dataset.demandaId = demandaId;
+
+            // Lógica dos botões
+            if (usuarioAtual === 'Coordenador') {
+                // Botão "Salvar Alterações" sempre aparece para Coordenador
+                btnSalvar.classList.remove('hidden');
+
+                // Botão "Salvar e Iniciar Curso" só aparece se status for "Programada"
+                if (demanda.status === 'Programada') {
+                    btnIniciar.classList.remove('hidden');
+                }
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function fecharModalDetalhes() {
+            document.getElementById('modal-detalhes-programada').classList.add('hidden');
+        }
+        
+        /**
+         * Função auxiliar para salvar os dados do formulário de detalhes.
+         * Retorna true/false para sucesso/falha.
+         */
+        async function salvarDadosModalDetalhes(demandaId) {
+            const form = document.getElementById('form-detalhes-curso');
+            if (form.dataset.demandaId !== demandaId) {
+                console.error("Inconsistência de ID no modal!");
+                return false;
+            }
+
+            const dadosParaSalvar = {
+                propostaSgset: form.querySelector('#detalhes-proposta-sgset').value || null,
+                demandaNumero: form.querySelector('#detalhes-demanda-num').value || null,
+                raeNumero: form.querySelector('#detalhes-rae').value || null,
+                videoLink: form.querySelector('#detalhes-video').value || null,
+                matrPrevistas: Number(form.querySelector('#detalhes-matr-previstas').value) || null,
+                matrRealizadas: Number(form.querySelector('#detalhes-matr-realizadas').value) || null,
+                evasao: Number(form.querySelector('#detalhes-evasao').value) || null,
+                receitaFinal: Number(form.querySelector('#detalhes-receita').value) || null,
+            };
+
+            try {
+                const demandaRef = doc(db, demandasCol.path, demandaId);
+                await updateDoc(demandaRef, dadosParaSalvar);
+                return true; // Sucesso
+            } catch (error) {
+                console.error("Erro ao salvar detalhes:", error);
+                mostrarNotificacao(`Erro ao salvar: ${error.message}`, 'erro');
+                return false; // Falha
+            }
+        }
+        
+        /**
+         * Botão "Salvar Alterações"
+         */
+        async function handleSalvarDetalhes(event) {
+            event.preventDefault();
+            const demandaId = document.getElementById('form-detalhes-curso').dataset.demandaId;
+            if (!demandaId) return;
+
+            const sucesso = await salvarDadosModalDetalhes(demandaId);
+            if (sucesso) {
+                mostrarNotificacao('Alterações salvas com sucesso!', 'sucesso');
+                fecharModalDetalhes();
+            }
+        }
+
+        /**
+         * Botão "Salvar e Iniciar Curso"
+         */
+        async function handleIniciarCurso(event) {
+            event.preventDefault();
+            const demandaId = document.getElementById('form-detalhes-curso').dataset.demandaId;
+            if (!demandaId) return;
+            
+            // 1. Salva os dados primeiro
+            const sucessoSalvar = await salvarDadosModalDetalhes(demandaId);
+            
+            if (!sucessoSalvar) {
+                // A notificação de erro já foi mostrada por salvarDadosModalDetalhes
+                return;
+            }
+            
+            // 2. Se salvou, inicia o curso (atualiza status)
+            try {
+                const demandaRef = doc(db, demandasCol.path, demandaId);
+                await updateDoc(demandaRef, {
+                    status: 'Em Andamento'
+                });
+                
+                mostrarNotificacao('Dados salvos e curso iniciado! Movido para "Em Andamento".', 'sucesso');
+                fecharModalDetalhes();
+                
+                // Mudar para a aba "Em Andamento"
+                mudarAbaStatus(null, 'Em Andamento');
+                
+            } catch (error) {
+                console.error("Erro ao iniciar curso (após salvar):", error);
+                mostrarNotificacao(`Erro ao iniciar curso: ${error.message}`, 'erro');
+            }
+        }
+        
+        // --- FIM MODAL DETALLHES ---
+
         async function confirmarAlocacao(event) {
             const btn = event.target;
             const docenteId = btn.dataset.docenteId;
@@ -1532,10 +1796,6 @@
 
         /**
          * Verifica se a nova demanda conflita com as existentes
-         * @param {object} novaDemanda - A demanda a ser alocada
-         * @param {Array} demandasExistentes - Todas as outras demandas
-         * @param {string} tipo - 'docente' ou 'recurso'
-         * @param {string} id - ID do docente ou recurso a ser verificado
          */
         function verificarConflito(novaDemanda, demandasExistentes, tipo, id) {
             const novaDataInicio = timestampParaData(novaDemanda.dataInicio);
@@ -1780,7 +2040,7 @@
                 });
             });
 
-            // Modal: Alocação e Aprovação
+            // Modal: Alocação, Aprovação e Detalhes
             document.getElementById('tabela-demandas-corpo').addEventListener('click', (e) => {
                 if (e.target && e.target.classList.contains('btn-alocar')) {
                     abrirModalAlocacao(e.target.dataset.id);
@@ -1788,7 +2048,10 @@
                 if (e.target && e.target.classList.contains('btn-aprovar')) {
                     handleAprovarDemanda(e.target.dataset.id);
                 }
-                // Adicionar lógica para 'btn-detalhes' se necessário
+                // Listener para 'Ver Detalhes'
+                if (e.target && e.target.classList.contains('btn-detalhes')) {
+                    abrirModalDetalhes(e.target.dataset.id);
+                }
             });
             document.getElementById('btn-fechar-modal-alocacao').addEventListener('click', fecharModalAlocacao);
             document.getElementById('modal-backdrop-alocacao').addEventListener('click', fecharModalAlocacao);
@@ -1797,6 +2060,13 @@
                     confirmarAlocacao(e);
                 }
             });
+            
+            // Listeners para Modal Detalhes
+            document.getElementById('btn-fechar-modal-detalhes').addEventListener('click', fecharModalDetalhes);
+            document.getElementById('btn-fechar-modal-detalhes-footer').addEventListener('click', fecharModalDetalhes);
+            document.getElementById('modal-backdrop-detalhes').addEventListener('click', fecharModalDetalhes);
+            document.getElementById('btn-salvar-detalhes').addEventListener('click', handleSalvarDetalhes); // Novo Botão
+            document.getElementById('btn-iniciar-curso').addEventListener('click', handleIniciarCurso); // Botão antigo (agora Salva e Inicia)
             
             // Filtros da Agenda
             document.getElementById('filtro-agenda-tipo').addEventListener('change', carregarFiltrosAgenda);
