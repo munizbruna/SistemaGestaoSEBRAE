@@ -460,8 +460,28 @@
         // --- Configuração Firebase ---
         
         // VARIÁVEIS GLOBAIS FORNECIDAS PELO AMBIENTE
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'wiki1dtm';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // Sanitiza o __app_id para remover caracteres inválidos de caminho (/) e (.), substituindo por (_)
+        // Isso previne o erro "Invalid collection reference" quando o __app_id é um caminho de arquivo.
+        const appId = (typeof __app_id !== 'undefined' ? __app_id : 'default-app-id').replace(/[\/.]/g, '_');
+        
+        // Configuração de fallback que você forneceu
+        const fallbackConfigString = JSON.stringify({
+            apiKey: "AIzaSyDbW0dkt22E1n5qVF_OZ2T2Gz1NhfrbRpU",
+            authDomain: "sebrae-senai.firebaseapp.com",
+            projectId: "sebrae-senai",
+            storageBucket: "sebrae-senai.firebasestorage.app",
+            messagingSenderId: "1036889332274",
+            appId: "1:1036889332274:web:b9fba58ed2804d0e8b3a2b",
+            measurementId: "G-N1YLFJ3J80"
+        });
+
+        // Tenta usar a config do ambiente (__firebase_config). Se não existir ou estiver vazia ('{}'), usa o fallbackConfigString.
+        const firebaseConfigString = typeof __firebase_config !== 'undefined' && __firebase_config !== '{}' 
+            ? __firebase_config 
+            : fallbackConfigString;
+            
+        const firebaseConfig = JSON.parse(firebaseConfigString);
+        
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         let app, db, auth;
@@ -484,12 +504,19 @@
 
         async function inicializarApp() {
             try {
+                // Verificação: Se o firebaseConfig ainda não tiver projectId, é um erro fatal.
+                if (!firebaseConfig.projectId) {
+                    console.error("Configuração do Firebase está incompleta! Falta 'projectId'.", firebaseConfig);
+                    throw new Error("'projectId' não encontrado na configuração do Firebase.");
+                }
+
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 setLogLevel('Debug'); // Ativa logs detalhados do Firestore
 
-                console.log("Firebase App inicializado. Aguardando autenticação...");
+                console.log("Firebase App inicializado com projectId:", firebaseConfig.projectId, ". Aguardando autenticação...");
+                console.log("Usando App ID sanitizado:", appId); // Log para verificar o ID sanitizado
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
@@ -521,7 +548,7 @@
 
             } catch (error) {
                 console.error("Erro ao inicializar Firebase:", error);
-                document.body.innerHTML = "<div class='p-10 text-center text-red-600'>Erro crítico ao conectar com o banco de dados. Verifique a configuração do Firebase.</div>";
+                document.body.innerHTML = `<div class='p-10 text-center text-red-600'>Erro crítico ao conectar com o banco de dados. Verifique a configuração do Firebase. Detalhe: ${error.message}</div>`;
             }
         }
 
@@ -542,7 +569,10 @@
         // --- Ouvintes do Firestore (Listeners) ---
 
         function iniciarOuvintes() {
-            if (!isAuthReady) return;
+            if (!isAuthReady) {
+                console.warn("Ouvintes do Firestore bloqueados. Autenticação pendente.");
+                return;
+            }
 
             console.log("Iniciando ouvintes do Firestore...");
 
@@ -604,7 +634,9 @@
             }
             
             if(telaId === 'tela-agenda') {
-                setTimeout(() => calendar.render(), 10); // Garante renderização do calendário
+                setTimeout(() => {
+                    if (calendar) calendar.render();
+                }, 10); // Garante renderização do calendário
             }
         }
 
@@ -642,8 +674,8 @@
                 // Força o tipo de demanda para Solicitante
                 if (tipoDemandaCoord) tipoDemandaCoord.disabled = true;
                 if (tipoDemandaSoli) {
-                    tipoDemandaSoli.disabled = true;
-                    tipoDemandaSoli.checked = true;
+                    tipoSoli.disabled = true;
+                    tipoSoli.checked = true;
                 }
 
                 // Se estava na aba 'Aguardando Aprovação', move para 'Solicitada'
@@ -754,6 +786,10 @@
         // --- TELA 2: Agenda ---
 
         function inicializarCalendario() {
+            if (calendar) {
+                calendar.render(); // Se já existe, apenas renderiza
+                return;
+            }
             const calendarEl = document.getElementById('calendar');
             calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
