@@ -1,0 +1,38 @@
+      /* Estilos personalizados */
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f4f7fa;
+      }
+      /* Esconde telas por padrão */
+      .tela {
+        display: none;
+      }
+      /* Mostra a tela ativa */
+      .tela.ativa {
+        display: block;
+      }
+      /* Ajustes para o modal */
+      #modal-backdrop {
+        background-color: rgba(0, 0, 0, 0.5);
+      }
+      /* Ajustes do FullCalendar */
+      :root {
+        --fc-border-color: #e2e8f0;
+        --fc-daygrid-event-dot-width: 8px;
+        --fc-list-event-hover-bg-color: #f1f5f9;
+      }
+      .fc .fc-toolbar-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      .fc .fc-button-primary {
+        background-color: #2563eb;
+        border-color: #2563eb;
+      }
+      .fc .fc-button-primary:hover {
+        background-color: #1d4ed8;
+        border-color: #1d4ed8;
+      }
+      .fc .fc-daygrid-day.fc-day-today {
+        background-color: #f0f9ff;
+      }
