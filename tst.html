@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGD-A - Sistema de Gestão de Demandas e Alocação (MVP)</title>
+    <!-- Injeção do Tailwind CSS via CDN para garantir o estilo imediato no ambiente Canvas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Importação da Fonte Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons (Ícones) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Estilos Globais e Resets */
+        :root {
+            --primary-color: #2563eb; /* blue-600 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden; /* Controlado pela div #app */
+            background-color: #f8fafc; /* slate-50 */
+            color: #1e293b; /* slate-800 */
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Scrollbar Personalizada */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Classes para animação de transição */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Estilo da Tabela em Mobile */
+        .table-container {
+            overflow-x: auto;
+        }
+        .min-w-full {
+            min-width: 700px; /* Garante que a tabela não quebre em colunas em telas pequenas */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="flex flex-col h-screen bg-slate-50 text-slate-800 overflow-hidden">
+        <!-- O conteúdo será injetado aqui pelo JavaScript -->
+    </div>
+
+    <script>
+        // =======================================================
+        // 1. MOCK DATA (Dados baseados nos CSVs)
+        // =======================================================
+        const MOCK_CURSOS = [
+            { id: 1, area: 'Alimentos e Bebidas', titulo: 'Fabricação De Ovos De Páscoa E Bombons', ch_senai: 20 },
+            { id: 2, area: 'Alimentos e Bebidas', titulo: 'Fabricação De Panetones E Doces Natalinos', ch_senai: 20 },
+            { id: 3, area: 'Gestão', titulo: 'Excel - Básico', ch_senai: 20 },
+            { id: 4, area: 'Automotiva', titulo: 'Mecânica de Motores Ciclo Otto', ch_senai: 60 },
+            { id: 5, area: 'Metalurgia', titulo: 'Técnicas Básicas em Serralheria', ch_senai: 80 },
+            { id: 6, area: 'Construção Civil', titulo: 'Instalações Elétricas Residenciais', ch_senai: 40 },
+        ];
+
+        const MOCK_DOCENTES = [
+            { id: 101, nome: 'Hildo', area: 'Alimentos e Bebidas', contrato: 'Horista', cidade_base: 'Marília' },
+            { id: 102, nome: 'Patricia', area: 'Gestão', contrato: 'Mensalista', cidade_base: 'Pompeia' },
+            { id: 103, nome: 'Mariana', area: 'Metalurgia', contrato: 'Horista', cidade_base: 'Marília' },
+            { id: 104, nome: 'Carlos', area: 'Automotiva', contrato: 'Determinado', cidade_base: 'Assis' },
+            { id: 105, nome: 'Roberto', area: 'Construção Civil', contrato: 'Horista', cidade_base: 'Rinopolis' },
+        ];
+
+        let MOCK_DEMANDAS = [
+            { id: 'D-2025-001', curso_id: 1, solicitante: 'Herith', municipio: 'Maracaí', local: 'Escola Estadual', status: 'Solicitado', data_inicio: '2025-03-17', docente_alocado: null },
+            { id: 'D-2025-002', curso_id: 1, solicitante: 'Herith', municipio: 'Maracaí', local: 'Escola Estadual (Noite)', status: 'Solicitado', data_inicio: '2025-03-17', docente_alocado: null },
+            { id: 'D-2025-003', curso_id: 5, solicitante: 'Patricia', municipio: 'Rinopolis', local: 'Escola Móvel 1075', status: 'Em Análise', data_inicio: '2025-07-07', docente_alocado: null },
+            { id: 'D-2025-004', curso_id: 6, solicitante: 'Patricia', municipio: 'Rinopolis', local: 'A definir', status: 'Programado', data_inicio: '2025-04-22', docente_alocado: 105 },
+            { id: 'D-2025-005', curso_id: 3, solicitante: 'Carlos', municipio: 'Assis', local: 'Sala de Treinamento', status: 'Solicitado', data_inicio: '2025-06-01', docente_alocado: null },
+            { id: 'D-2025-006', curso_id: 4, solicitante: 'João', municipio: 'Marília', local: 'Oficina Móvel', status: 'Programado', data_inicio: '2025-08-10', docente_alocado: 104 },
+        ];
+
+        // =======================================================
+        // 2. STATE MANAGEMENT (Gerenciamento de Estado)
+        // =======================================================
+        const appState = {
+            activeTab: 'demandas',
+            selectedDemand: null,
+            demandaFilter: 'pending', // Novo estado para filtro: 'all', 'pending', 'programado'
+        };
+
+        const setActiveTab = (tab) => {
+            appState.activeTab = tab;
+            renderApp();
+        };
+
+        const setDemandaFilter = (filter) => {
+            appState.demandaFilter = filter;
+            renderApp();
+        };
+
+        const setSelectedDemand = (demand) => {
+            appState.selectedDemand = demand;
+            renderAllocationModal();
+        }
+
+        // =======================================================
+        // 3. UTILS (Funções Auxiliares)
+        // =======================================================
+
+        const getStatusBadge = (status) => {
+            const colors = {
+                'Solicitado': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                'Em Análise': 'bg-blue-100 text-blue-800 border-blue-200',
+                'Programado': 'bg-green-100 text-green-800 border-green-200',
+                'Cancelado': 'bg-red-100 text-red-800 border-red-200',
+            };
+            const colorClass = colors[status] || 'bg-gray-100';
+            return `<span class="px-3 py-1 rounded-full text-xs font-bold border ${colorClass}">
+                        ${status.toUpperCase()}
+                    </span>`;
+        };
+
+        const getCardHTML = (title, value, iconName, subtext, colorClass) => {
+            return `
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">${title}</p>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-2">${value}</h3>
+                        </div>
+                        <div class="p-3 rounded-xl ${colorClass} bg-opacity-20">
+                            <i data-lucide="${iconName}" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    ${subtext ? `<div class="mt-4 text-xs font-medium text-slate-400 border-t border-slate-50 pt-2">${subtext}</div>` : ''}
+                </div>`;
+        };
+        
+        // =======================================================
+        // 4. HANDLERS (Funções de Interação)
+        // =======================================================
+        
+        const handleNovaDemanda = () => {
+            // Placeholder de funcionalidade para "Nova Demanda" (RF06 - Criar demanda)
+            console.log("Ação: Iniciando o fluxo de criação de Nova Demanda.");
+            // Substituir por um modal de formulário na Fase 2
+            alert("A funcionalidade de 'Nova Demanda' será implementada em breve. Foco agora é na Alocação.");
+        };
+
+        const handleAllocateClick = (demandaId) => {
+            const demand = MOCK_DEMANDAS.find(d => d.id === demandaId);
+            setSelectedDemand(demand);
+        };
+
+        const confirmAllocation = (docenteId) => {
+            MOCK_DEMANDAS = MOCK_DEMANDAS.map(d => 
+                d.id === appState.selectedDemand.id 
+                    ? { ...d, status: 'Programado', docente_alocado: docenteId } 
+                    : d
+            );
+            
+            // Fecha o modal e renderiza novamente a tela
+            setSelectedDemand(null);
+            renderApp(); 
+            // Após a alocação, a próxima fase envolveria o RF08 (Notificação/Aceite)
+            console.log(`Demanda ${appState.selectedDemand.id} programada para o Docente ID: ${docenteId}. Próximo passo: notificar Docente/Solicitante (RF08)`);
+        };
+
+        // =======================================================
+        // 5. RENDERING (Funções de Renderização)
+        // =======================================================
+
+        const renderNavbar = () => {
+            const tabs = [
+                { id: 'dashboard', label: 'Dashboard' },
+                { id: 'demandas', label: 'Demandas' },
+                { id: 'docentes', label: 'Docentes' },
+                { id: 'calendario', label: 'Calendário' }
+            ];
+
+            const navItems = tabs.map(tab => {
+                const isActive = appState.activeTab === tab.id;
+                const activeClass = isActive 
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200' 
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600';
+                
+                return `
+                    <button
+                        onclick="setActiveTab('${tab.id}')"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeClass}"
+                    >
+                        ${tab.label}
+                    </button>
+                `;
+            }).join('');
+
+            return `
+                <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 flex-shrink-0 shadow-sm">
+                    <div class="flex items-center space-x-6">
+                        <div class="flex items-center space-x-3 flex-shrink-0">
+                            <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center text-white font-bold text-lg leading-tight">
+                                S
+                            </div>
+                            <span class="font-bold text-lg tracking-tight text-slate-800 hidden sm:block">SGD-A</span>
+                        </div>
+                        
+                        <nav class="hidden md:flex space-x-2">
+                            ${navItems}
+                        </nav>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <div class="relative hidden sm:block">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+                            <input 
+                                type="text" 
+                                placeholder="Buscar..." 
+                                class="pl-9 pr-3 py-1.5 bg-slate-100 border-transparent focus:bg-white border focus:border-blue-300 rounded-full text-sm w-40 md:w-56 outline-none transition-all duration-300"
+                            />
+                        </div>
+                        <div class="flex items-center space-x-3 pl-3 border-l border-slate-200">
+                            <div class="text-right hidden lg:block">
+                                <p class="text-sm font-bold text-slate-700 leading-tight">Tech Lead</p>
+                                <p class="text-xs text-slate-500">SEBRAE</p>
+                            </div>
+                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm border-2 border-white shadow-sm cursor-pointer">
+                                TL
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            `;
+        };
+
+        const renderSubHeader = () => {
+            let title = '';
+            switch (appState.activeTab) {
+                case 'dashboard': title = 'Visão Geral do Sistema'; break;
+                case 'demandas': title = 'Gestão e Alocação de Demandas'; break;
+                case 'docentes': title = 'Banco de Docentes e Competências'; break;
+                case 'calendario': title = 'Calendário Geral de Cursos'; break;
+            }
+
+            return `
+                <div class="bg-white border-b border-slate-200 px-4 sm:px-8 py-4 flex-shrink-0">
+                    <h2 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">${title}</h2>
+                </div>
+            `;
+        };
+
+        const renderDashboard = () => {
+            const stats = {
+                total: MOCK_DEMANDAS.length,
+                solicitados: MOCK_DEMANDAS.filter(d => d.status === 'Solicitado').length,
+                programados: MOCK_DEMANDAS.filter(d => d.status === 'Programado').length,
+                analise: MOCK_DEMANDAS.filter(d => d.status === 'Em Análise').length,
+            };
+            
+            const totalAguardando = stats.solicitados + stats.analise;
+
+            return `
+                <div class="space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                        ${getCardHTML("Total Demandas", stats.total, "briefcase", "Ciclo 2025 - Atualizado hoje", "bg-slate-100 text-slate-600")}
+                        ${getCardHTML("Aguardando", totalAguardando, "alert-circle", "Requer atenção imediata", "bg-amber-100 text-amber-600")}
+                        ${getCardHTML("Programados", stats.programados, "check-circle", "Agenda confirmada", "bg-emerald-100 text-emerald-600")}
+                        ${getCardHTML("Ocupação", "68%", "users", "Capacidade docente", "bg-blue-100 text-blue-600")}
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+                        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                                <h3 class="font-bold text-slate-800">Demandas Recentes</h3>
+                                <button onclick="setActiveTab('demandas')" class="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">Ver todas as demandas &rarr;</button>
+                            </div>
+                            <div class="divide-y divide-slate-100 flex-1">
+                                ${MOCK_DEMANDAS.slice(0, 3).map(demanda => {
+                                    const curso = MOCK_CURSOS.find(c => c.id === demanda.curso_id);
+                                    return `
+                                        <div class="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer">
+                                            <div class="flex items-center space-x-5">
+                                                <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                                    <i data-lucide="book-open" class="w-5 h-5"></i>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-slate-800 text-sm">${curso?.titulo}</p>
+                                                    <div class="flex items-center mt-1 space-x-2">
+                                                        <span class="text-xs text-slate-500 flex items-center"><i data-lucide="map-pin" class="w-3 h-3 mr-1"></i> ${demanda.municipio}</span>
+                                                        <span class="text-slate-300">•</span>
+                                                        <span class="text-xs text-slate-500">${demanda.solicitante}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-4">
+                                                ${getStatusBadge(demanda.status)}
+                                                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition-colors"></i>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col">
+                            <h3 class="font-bold text-slate-800 mb-5">Alertas & Insights</h3>
+                            <ul class="space-y-4 flex-1">
+                                <li class="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                                    <i data-lucide="alert-circle" class="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0"></i>
+                                    <span class="text-sm text-red-800">Conflito: <strong>Hildo</strong> (Marília) x Demanda #002.</span>
+                                </li>
+                                <li class="flex items-start space-x-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                    <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"></i>
+                                    <span class="text-sm text-amber-800">Baixa oferta para cursos de "Logística" em Assis.</span>
+                                </li>
+                                <li class="flex items-start space-x-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                                    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0"></i>
+                                    <span class="text-sm text-emerald-800">Cota "Empreenda Rápido" atualizada.</span>
+                                </li>
+                            </ul>
+                            <button class="w-full mt-4 py-2 text-sm text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                                Ver relatório completo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderDemandas = () => {
+            let filteredDemandas = MOCK_DEMANDAS;
+
+            if (appState.demandaFilter === 'pending') {
+                filteredDemandas = MOCK_DEMANDAS.filter(d => d.status === 'Solicitado' || d.status === 'Em Análise');
+            } else if (appState.demandaFilter === 'programado') {
+                filteredDemandas = MOCK_DEMANDAS.filter(d => d.status === 'Programado');
+            }
+
+            const tableRows = filteredDemandas.map(demanda => {
+                const curso = MOCK_CURSOS.find(c => c.id === demanda.curso_id);
+                const docente = MOCK_DOCENTES.find(d => d.id === demanda.docente_alocado);
+                const isProgramado = demanda.status === 'Programado';
+                
+                return `
+                    <tr class="hover:bg-slate-50 group transition-colors">
+                        <td class="px-6 py-4 font-mono text-xs text-slate-400">${demanda.id}</td>
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-slate-800">${curso?.titulo}</div>
+                            <div class="text-xs text-blue-600 bg-blue-50 border border-blue-100 inline-block px-2 py-0.5 rounded-full mt-1.5 font-medium">${curso?.area}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center text-slate-700 font-medium">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
+                                ${demanda.municipio}
+                            </div>
+                            <div class="text-xs text-slate-400 pl-5 mt-0.5">${demanda.local}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center text-slate-600">
+                                <i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-slate-400"></i>
+                                ${demanda.data_inicio}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            ${docente ? `
+                                <div class="flex items-center space-x-2 text-slate-700 bg-slate-100 py-1 px-2 rounded-full w-max">
+                                    <div class="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-200">
+                                        ${docente.nome.charAt(0)}
+                                    </div>
+                                    <span class="text-xs font-medium pr-1">${docente.nome}</span>
+                                </div>
+                            ` : `
+                                <span class="text-slate-400 italic text-xs flex items-center">
+                                    <div class="w-2 h-2 bg-slate-300 rounded-full mr-2"></div>
+                                    Pendente
+                                </span>
+                            `}
+                        </td>
+                        <td class="px-6 py-4">
+                            ${getStatusBadge(demanda.status)}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            ${!isProgramado ? `
+                                <button 
+                                    onclick="handleAllocateClick('${demanda.id}')"
+                                    class="text-blue-600 hover:text-white hover:bg-blue-600 font-semibold text-xs px-4 py-2 border border-blue-200 rounded-lg transition-all duration-200 whitespace-nowrap"
+                                >
+                                    Alocar Recurso
+                                </button>
+                            ` : `
+                                <button class="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100" aria-label="Detalhes">
+                                    <i data-lucide="chevron-right" class="w-4.5 h-4.5"></i>
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const filterButton = (id, label) => {
+                const isActive = appState.demandaFilter === id;
+                const activeClass = isActive 
+                    ? 'bg-white shadow-sm font-semibold text-slate-800' 
+                    : 'text-slate-500 hover:text-slate-800 font-medium';
+                
+                return `
+                    <button 
+                        onclick="setDemandaFilter('${id}')" 
+                        class="px-4 py-1.5 rounded-md text-sm transition-colors ${activeClass}"
+                    >
+                        ${label}
+                    </button>
+                `;
+            };
+
+            return `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center bg-white">
+                        <div class="flex space-x-2 bg-slate-100 p-1 rounded-lg">
+                            ${filterButton('all', 'Todos')}
+                            ${filterButton('pending', 'Pendentes')}
+                            ${filterButton('programado', 'Programados')}
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <button class="p-2 text-slate-400 hover:text-blue-600 border border-slate-200 rounded-lg hover:bg-slate-50" aria-label="Filtrar"><i data-lucide="filter" class="w-4.5 h-4.5"></i></button>
+                            <button 
+                                onclick="handleNovaDemanda()" 
+                                class="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5"
+                            >
+                                <i data-lucide="plus" class="w-4 h-4 mr-1"></i>
+                                <span>Nova Demanda</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase text-xs tracking-wider">
+                                <tr>
+                                    <th class="px-6 py-4">ID</th>
+                                    <th class="px-6 py-4">Curso / Área</th>
+                                    <th class="px-6 py-4 min-w-[150px]">Localidade</th>
+                                    <th class="px-6 py-4">Datas</th>
+                                    <th class="px-6 py-4 min-w-[120px]">Docente</th>
+                                    <th class="px-6 py-4">Status</th>
+                                    <th class="px-6 py-4 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                ${tableRows.length > 0 ? tableRows : `
+                                    <tr><td colspan="7" class="text-center py-12 text-slate-500 italic">Nenhuma demanda encontrada com o filtro selecionado.</td></tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderDocentes = () => {
+            return `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${MOCK_DOCENTES.map(docente => `
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 transition-all group cursor-pointer">
+                            <div class="flex justify-between items-start mb-6">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg border-2 border-white shadow-sm group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                        ${docente.nome.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-slate-800 text-lg">${docente.nome}</h3>
+                                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">${docente.contrato}</p>
+                                    </div>
+                                </div>
+                                <span class="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-md text-xs font-semibold border border-slate-100">
+                                    ${docente.cidade_base}
+                                </span>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="text-sm text-slate-600">
+                                    <span class="block text-[10px] text-slate-400 uppercase font-bold mb-2 tracking-wider">Área de Atuação</span>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2.5 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium border border-blue-100">${docente.area}</span>
+                                    </div>
+                                </div>
+                                <div class="pt-4 border-t border-slate-100 flex justify-between items-center">
+                                    <span class="text-xs text-emerald-600 font-bold flex items-center bg-emerald-50 px-2 py-1 rounded-full">
+                                        <i data-lucide="check-circle" class="w-3 h-3 mr-1"></i> DISPONÍVEL
+                                    </span>
+                                    <button class="text-slate-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-md transition-colors" aria-label="Ver Calendário">
+                                        <i data-lucide="calendar" class="w-4.5 h-4.5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        };
+
+        const renderCalendario = () => {
+             return `
+                <div class="bg-white h-96 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-slate-400">
+                   <div class="bg-slate-50 p-6 rounded-full mb-4">
+                     <i data-lucide="calendar" class="w-12 h-12 text-slate-300"></i>
+                   </div>
+                   <h3 class="text-lg font-bold text-slate-700 mb-1">Módulo de Calendário</h3>
+                   <p class="text-sm text-slate-500">Funcionalidade prevista para a Fase 2.</p>
+                   <button class="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-md">Ver Roadmap</button>
+                 </div>
+             `;
+        };
+
+        const renderMainContent = () => {
+            let contentHTML = '';
+            switch (appState.activeTab) {
+                case 'dashboard': contentHTML = renderDashboard(); break;
+                case 'demandas': contentHTML = renderDemandas(); break;
+                case 'docentes': contentHTML = renderDocentes(); break;
+                case 'calendario': contentHTML = renderCalendario(); break;
+            }
+
+            return `
+                <main class="flex-1 flex flex-col overflow-hidden relative">
+                    ${renderSubHeader()}
+                    <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth">
+                        ${contentHTML}
+                    </div>
+                </main>
+            `;
+        };
+        
+        const renderAllocationModal = () => {
+            const modalContainer = document.getElementById('modal-container');
+            if (!appState.selectedDemand) {
+                if (modalContainer) modalContainer.innerHTML = '';
+                return;
+            }
+
+            const demand = appState.selectedDemand;
+            const curso = MOCK_CURSOS.find(c => c.id === demand.curso_id);
+            const areaCurso = curso?.area;
+            const municipioDemanda = demand.municipio;
+
+            // Lógica Central: Filtra docentes pela área tecnológica do curso
+            const suggestedDocentes = MOCK_DOCENTES.filter(d => d.area === areaCurso);
+
+            const docenteItems = suggestedDocentes.map(docente => {
+                const isLocal = docente.cidade_base === municipioDemanda;
+                return `
+                    <div 
+                      onclick="confirmAllocation(${docente.id})"
+                      class="flex justify-between items-center p-4 rounded-xl border cursor-pointer transition-all duration-200 group ${
+                        isLocal 
+                          ? 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300 hover:shadow-md' 
+                          : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-md'
+                      }"
+                    >
+                      <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isLocal ? 'bg-white text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-600'}">
+                          ${docente.nome.charAt(0)}
+                        </div>
+                        <div>
+                          <p class="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">${docente.nome}</p>
+                          <p class="text-xs text-slate-500">${docente.contrato} • ${docente.cidade_base}</p>
+                        </div>
+                      </div>
+                      <div class="text-right flex flex-col items-end">
+                        ${isLocal ? `
+                          <span class="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-white px-2 py-0.5 rounded-full border border-emerald-100 mb-2 shadow-sm">
+                             <i data-lucide="check-circle" class="w-2.5 h-2.5 mr-1"></i> Local (Sem diária)
+                          </span>` : ''
+                        }
+                        <button class="text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-all ${isLocal ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-white border border-slate-200 text-slate-600 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600'}">
+                          Selecionar
+                        </button>
+                      </div>
+                    </div>
+                `;
+            }).join('');
+
+            const emptyState = suggestedDocentes.length === 0 ? `
+                <div class="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-3 opacity-50"></i>
+                    <p class="font-medium">Nenhum docente compatível encontrado.</p>
+                    <p class="text-xs mt-1">Tente expandir a busca para cidades vizinhas.</p>
+                </div>
+            ` : '';
+
+            modalContainer.innerHTML = `
+                <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in">
+                    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 transform transition-all scale-100">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Alocação de Recurso</h3>
+                                <p class="text-sm text-slate-500 mt-0.5">Selecione um docente compatível para esta demanda.</p>
+                            </div>
+                            <button onclick="setSelectedDemand(null)" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors" aria-label="Fechar Modal">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="p-6 bg-slate-50 border-b border-slate-200">
+                            <div class="grid grid-cols-2 gap-6 text-sm">
+                                <div>
+                                    <span class="block text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Curso Solicitado</span>
+                                    <span class="font-semibold text-slate-800 text-base">${curso?.titulo}</span>
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Local & Data</span>
+                                    <div class="flex items-center text-slate-700">
+                                         <i data-lucide="map-pin" class="w-3.5 h-3.5 mr-1 text-slate-400"></i> ${demand.municipio}
+                                    </div>
+                                    <div class="flex items-center text-slate-700 mt-1">
+                                         <i data-lucide="clock" class="w-3.5 h-3.5 mr-1 text-slate-400"></i> ${demand.data_inicio}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-6 max-h-[400px] overflow-y-auto">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Sugestões de Alocação (IA Match)</h4>
+                            <div class="space-y-3">
+                                ${docenteItems}
+                                ${emptyState}
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-slate-50 text-right border-t border-slate-200">
+                            <button onclick="setSelectedDemand(null)" class="text-slate-500 hover:text-slate-800 text-sm font-medium px-6 py-2 rounded-lg hover:bg-slate-200 transition-colors">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Re-renderiza ícones após injeção do HTML
+            lucide.createIcons();
+        };
+
+
+        const renderApp = () => {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                ${renderNavbar()}
+                ${renderMainContent()}
+                <div id="modal-container"></div>
+            `;
+            // Renderiza o modal se houver uma demanda selecionada
+            renderAllocationModal(); 
+            // Renderiza todos os ícones após a injeção principal do HTML
+            lucide.createIcons();
+        };
+
+        // =======================================================
+        // 6. INÍCIO DA APLICAÇÃO
+        // =======================================================
+        document.addEventListener('DOMContentLoaded', renderApp);
+
+    </script>
+</body>
+</html>
