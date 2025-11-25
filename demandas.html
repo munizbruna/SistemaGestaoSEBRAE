@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGD-A | Gestão de Demandas</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Fontes -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .sebrae-blue { color: #005CA9; }
+        .sebrae-bg { background-color: #005CA9; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // --- MOCK DATA (Baseado nos CSVs fornecidos) ---
+        const MOCK_CURSOS = [
+            "Fabricação De Ovos De Páscoa E Bombons",
+            "Boas Práticas De Fabricação",
+            "Fabricação De Pizzas E Salgados Assados",
+            "Técnicas Básicas Em Serralheria",
+            "Instalação De Dispositivos Eletroeletrônicos",
+            "Conferente De Carga E Descarga"
+        ];
+
+        const MOCK_SOLICITANTES = [
+            "Herith",
+            "Patricia",
+            "Mariana",
+            "Sebrae Regional"
+        ];
+
+        const MOCK_MUNICIPIOS = [
+            "Maracaí",
+            "Rinopolis",
+            "Julio Mesquita",
+            "Assis",
+            "Ourinhos"
+        ];
+
+        const MOCK_DEMANDAS = [
+            { id: "D-2025-001", curso: "Fabricação De Ovos De Páscoa E Bombons", solicitante: "Herith", municipio: "Maracaí", status: "Solicitado", dataInicio: "2025-03-17", docente: "Hildo" },
+            { id: "D-2025-002", curso: "Técnicas Básicas Em Serralheria", solicitante: "Patricia", municipio: "Rinopolis", status: "Em Análise", dataInicio: "2025-07-07", docente: null },
+            { id: "D-2025-003", curso: "Instalação Elétrica Residencial", solicitante: "Patricia", municipio: "Rinopolis", status: "Programado", dataInicio: "2025-04-22", docente: "Escola Móvel 1060" },
+        ];
+
+        // --- COMPONENTES ---
+
+        // Botão Genérico
+        const Button = ({ children, onClick, variant = 'primary', className = '', type = 'button' }) => {
+            const baseStyle = "px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 text-sm";
+            const variants = {
+                primary: "bg-blue-700 text-white hover:bg-blue-800",
+                secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
+                danger: "bg-red-600 text-white hover:bg-red-700",
+                ghost: "text-gray-600 hover:bg-gray-100"
+            };
+            return (
+                <button type={type} onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`}>
+                    {children}
+                </button>
+            );
+        };
+
+        // Badge de Status
+        const StatusBadge = ({ status }) => {
+            const styles = {
+                'Solicitado': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                'Em Análise': 'bg-blue-100 text-blue-800 border-blue-200',
+                'Programado': 'bg-green-100 text-green-800 border-green-200',
+                'Cancelado': 'bg-red-100 text-red-800 border-red-200',
+                'Realizado': 'bg-gray-100 text-gray-800 border-gray-200'
+            };
+            return (
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${styles[status] || styles['Solicitado']}`}>
+                    {status}
+                </span>
+            );
+        };
+
+        // MODAL COMPONENT
+        const Modal = ({ isOpen, onClose, title, children, footer }) => {
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden animate-fade-in-up">
+                        <div className="flex justify-between items-center p-5 border-b border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                                <i data-lucide="x" className="w-6 h-6"></i>
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[70vh] overflow-y-auto">
+                            {children}
+                        </div>
+                        {footer && (
+                            <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                                {footer}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // APP PRINCIPAL
+        const App = () => {
+            const [demandas, setDemandas] = useState(MOCK_DEMANDAS);
+            const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, data: null });
+            const [formData, setFormData] = useState({});
+
+            useEffect(() => {
+                lucide.createIcons();
+            }, [demandas, modalConfig]);
+
+            // Handlers
+            const openModal = (type, data = null) => {
+                setModalConfig({ isOpen: true, type, data });
+                if (type === 'create') {
+                    setFormData({ status: 'Solicitado', municipio: '' }); // Defaults
+                } else if (data) {
+                    setFormData({ ...data });
+                }
+            };
+
+            const closeModal = () => {
+                setModalConfig({ isOpen: false, type: null, data: null });
+                setFormData({});
+            };
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                // Simulação de salvamento
+                if (modalConfig.type === 'create') {
+                    const newDemanda = { ...formData, id: `D-2025-00${demandas.length + 1}` };
+                    setDemandas([...demandas, newDemanda]);
+                } else if (modalConfig.type === 'edit') {
+                    setDemandas(demandas.map(d => d.id === formData.id ? formData : d));
+                }
+                closeModal();
+            };
+
+            // Renderização do Conteúdo do Modal
+            const renderModalContent = () => {
+                const isView = modalConfig.type === 'details';
+                
+                return (
+                    <form id="modal-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Linha 1 */}
+                        <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Curso Solicitado</label>
+                            <select 
+                                name="curso" 
+                                value={formData.curso || ''} 
+                                onChange={handleInputChange}
+                                disabled={isView}
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
+                                required
+                            >
+                                <option value="">Selecione um curso...</option>
+                                {MOCK_CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Linha 2 */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Solicitante</label>
+                            <select 
+                                name="solicitante" 
+                                value={formData.solicitante || ''} 
+                                onChange={handleInputChange}
+                                disabled={isView}
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
+                                required
+                            >
+                                <option value="">Selecione...</option>
+                                {MOCK_SOLICITANTES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Município de Realização</label>
+                            <select 
+                                name="municipio" 
+                                value={formData.municipio || ''} 
+                                onChange={handleInputChange}
+                                disabled={isView}
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
+                                required
+                            >
+                                <option value="">Selecione...</option>
+                                {MOCK_MUNICIPIOS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Linha 3 */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Previsão de Início</label>
+                            <input 
+                                type="date" 
+                                name="dataInicio" 
+                                value={formData.dataInicio || ''} 
+                                onChange={handleInputChange}
+                                disabled={isView}
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select 
+                                name="status" 
+                                value={formData.status || 'Solicitado'} 
+                                onChange={handleInputChange}
+                                disabled={isView}
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
+                            >
+                                <option value="Solicitado">Solicitado</option>
+                                <option value="Em Análise">Em Análise</option>
+                                <option value="Programado">Programado</option>
+                                <option value="Cancelado">Cancelado</option>
+                                <option value="Realizado">Realizado</option>
+                            </select>
+                        </div>
+
+                        {/* Linha 4 - Docente (Aparece em todos, editável apenas se não for 'create' ou 'details' se quiser) */}
+                        <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Docente Alocado (Sugestão do Sistema)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    name="docente" 
+                                    value={formData.docente || ''} 
+                                    onChange={handleInputChange}
+                                    disabled={isView}
+                                    placeholder="Ainda não alocado"
+                                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                                />
+                                {!isView && (
+                                    <button type="button" className="bg-indigo-100 text-indigo-700 px-3 rounded hover:bg-indigo-200" title="Buscar Sugestão">
+                                        <i data-lucide="search" className="w-4 h-4"></i>
+                                    </button>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">A lógica de alocação automática virá na próxima sprint.</p>
+                        </div>
+                        
+                         {/* Observações */}
+                         <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                            <textarea 
+                                name="obs" 
+                                rows="3"
+                                disabled={isView}
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            ></textarea>
+                        </div>
+                    </form>
+                );
+            };
+
+            const renderModalFooter = () => {
+                if (modalConfig.type === 'details') {
+                    return (
+                        <Button onClick={closeModal} variant="secondary">Fechar</Button>
+                    );
+                }
+                return (
+                    <>
+                        <Button onClick={closeModal} variant="secondary">Cancelar</Button>
+                        <Button onClick={handleSubmit} variant="primary">
+                            {modalConfig.type === 'create' ? 'Criar Demanda' : 'Salvar Alterações'}
+                        </Button>
+                    </>
+                );
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header */}
+                    <header className="bg-white shadow-sm border-b border-gray-200 z-10">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-700 text-white p-2 rounded-lg font-bold text-xl tracking-tighter">SEBRAE</div>
+                                <div className="h-8 w-px bg-gray-300 mx-2"></div>
+                                <h1 className="text-lg font-semibold text-gray-700">SGD-A <span className="font-normal text-gray-400 text-sm">| Sistema de Gestão de Demandas e Alocação</span></h1>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-500">Olá, <strong>Gestor</strong></span>
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">G</div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="flex-1 bg-gray-50 p-8">
+                        <div className="max-w-7xl mx-auto">
+                            
+                            {/* Toolbar */}
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-800">Gestão de Demandas</h2>
+                                    <p className="text-gray-500">Visualize, cadastre e gerencie as solicitações de cursos.</p>
+                                </div>
+                                <Button onClick={() => openModal('create')} variant="primary">
+                                    <i data-lucide="plus" className="w-4 h-4"></i>
+                                    Nova Demanda
+                                </Button>
+                            </div>
+
+                            {/* Stats Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                    <div className="text-gray-500 text-sm font-medium mb-1">Total de Demandas</div>
+                                    <div className="text-3xl font-bold text-blue-700">{demandas.length}</div>
+                                </div>
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                    <div className="text-gray-500 text-sm font-medium mb-1">Pendentes</div>
+                                    <div className="text-3xl font-bold text-yellow-600">
+                                        {demandas.filter(d => d.status === 'Solicitado').length}
+                                    </div>
+                                </div>
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                    <div className="text-gray-500 text-sm font-medium mb-1">Sem Docente</div>
+                                    <div className="text-3xl font-bold text-red-600">
+                                        {demandas.filter(d => !d.docente).length}
+                                    </div>
+                                </div>
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                    <div className="text-gray-500 text-sm font-medium mb-1">Programados</div>
+                                    <div className="text-3xl font-bold text-green-600">
+                                        {demandas.filter(d => d.status === 'Programado').length}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Table */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                                    <div className="relative w-64">
+                                        <i data-lucide="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                                        <input type="text" placeholder="Buscar demanda..." className="pl-10 pr-4 py-2 w-full border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg border border-gray-200"><i data-lucide="filter" className="w-4 h-4"></i></button>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                                            <tr>
+                                                <th className="p-4 font-semibold">ID</th>
+                                                <th className="p-4 font-semibold">Curso</th>
+                                                <th className="p-4 font-semibold">Solicitante</th>
+                                                <th className="p-4 font-semibold">Local</th>
+                                                <th className="p-4 font-semibold">Início</th>
+                                                <th className="p-4 font-semibold">Status</th>
+                                                <th className="p-4 font-semibold text-right">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 text-sm">
+                                            {demandas.map((demanda) => (
+                                                <tr key={demanda.id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="p-4 font-medium text-gray-900">{demanda.id}</td>
+                                                    <td className="p-4 text-gray-700">{demanda.curso}</td>
+                                                    <td className="p-4 text-gray-600">{demanda.solicitante}</td>
+                                                    <td className="p-4 text-gray-600">{demanda.municipio}</td>
+                                                    <td className="p-4 text-gray-600">{new Date(demanda.dataInicio).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="p-4">
+                                                        <StatusBadge status={demanda.status} />
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => openModal('details', demanda)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Ver Detalhes">
+                                                                <i data-lucide="eye" className="w-4 h-4"></i>
+                                                            </button>
+                                                            <button onClick={() => openModal('edit', demanda)} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Editar">
+                                                                <i data-lucide="edit-2" className="w-4 h-4"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {demandas.length === 0 && (
+                                    <div className="p-8 text-center text-gray-500">
+                                        Nenhuma demanda encontrada.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Modal Component Instance */}
+                    <Modal 
+                        isOpen={modalConfig.isOpen} 
+                        onClose={closeModal} 
+                        title={
+                            modalConfig.type === 'create' ? 'Nova Demanda' : 
+                            modalConfig.type === 'edit' ? 'Editar Demanda' : 'Detalhes da Demanda'
+                        }
+                        footer={renderModalFooter()}
+                    >
+                        {renderModalContent()}
+                    </Modal>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
